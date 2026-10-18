@@ -112,7 +112,22 @@ Integration supplies the report content and its representation. Input Evaluation
 
 Input Evaluation receives the original GitHub issue content, source metadata, and a structured representation of any identified fields. Integration preserves the reporter’s original wording and explicitly represents missing or blank information. Input Evaluation remains responsible for interpreting the content and evaluating report quality.
 
-## 9. Items to Confirm with Integration
+## 9. Proposed Interface Requirements
+
+The following requirements formalize the responsibilities and information exchanges described in Sections 1–8. They are **proposed for joint review by Integration and Input Evaluation** and are not yet approved or baselined.
+
+| ID | Proposed interface requirement | Basis in this draft |
+| --- | --- | --- |
+| IE-IN-01 | Integration shall provide Input Evaluation with the original bug report and its source metadata. | Sections 2–3 |
+| IE-IN-02 | Integration shall provide a structured representation of the report while preserving the original field labels and values. | Sections 2 and 4 |
+| IE-IN-03 | Integration shall identify whether each extracted field is provided, blank, or absent. | Sections 4 and 6 |
+| IE-IN-04 | Integration shall preserve report information that cannot be reliably mapped to a structured field. | Sections 2 and 6 |
+| IE-IN-05 | Integration shall not invent missing information or determine whether the report satisfies quality criteria. | Sections 1, 6 and 7 |
+| IE-IN-06 | Input Evaluation shall evaluate the report against the defined quality criteria using the information received from Integration. | Sections 1 and 7 |
+
+**Status:** Proposed. The teams must confirm the interface details in the following section before treating these as agreed requirements.
+
+## 10. Items to Confirm with Integration
 
 Before finalizing the Gate 1 interface agreement, the teams should confirm:
 
