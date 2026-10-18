@@ -1,0 +1,185 @@
+# **Interface Agreement: Claim Investigation and Integration**
+
+**Interface name:** Claim Investigation and Integration Interface  
+**Owners:** Boyu Liu (Kilo524), Claim Investigation; Meshaal Aldawood (meshaalaldawood), Integration  
+**Status:** Draft  
+**Version and date approved:** Not yet approved
+
+## **1\. Purpose and Scope**
+
+This interface enables the Claim Investigation subsystem to provide investigation results to the Integration subsystem so that the results can be incorporated into the final maintainer-facing system output.
+
+This agreement covers the information passed from Claim Investigation to Integration, including the structure, required characteristics, and handling of investigation results.
+
+This agreement does not define:
+
+• How Claim Investigation performs its internal investigation.  
+• How Integration combines subsystem outputs into the final report.  
+• How Input Evaluation identifies or evaluates claims before they reach Claim Investigation.
+
+## **2\. Related Documents**
+
+• System requirements: documentation/system-requirements.md  
+• Interface management process: documentation/interface-agreements.md  
+• Claim Investigation working agreement: WORKING\_AGREEMENT.md  
+• Integration working agreement: Integration subsystem WORKING\_AGREEMENT.md  
+• Input Evaluation and Claim Investigation interface agreement: TBD  
+• Other related interface agreements: TBD
+
+## **3\. Interface Description**
+
+The interface is an information interface between the Claim Investigation subsystem and the Integration subsystem.
+
+Claim Investigation receives a checkable claim and its associated context, investigates that claim using public project artifacts, and produces an investigation result.
+
+The investigation result is then passed to Integration so that it can be incorporated into the final output presented to the maintainer.
+
+### **3.1 Simple Flow**
+
+Checkable Claim  
+↓  
+Claim Investigation  
+↓  
+Investigation Result \+ Evidence  
+↓  
+Integration  
+↓  
+Maintainer-Facing Output
+
+### **3.2 Interaction Type**
+
+Information: Structured information describing the result of a claim investigation, the evidence used, and any limitations or conditions that prevented the claim from being fully checked.
+
+No physical, energy, or material interactions are identified for this interface.
+
+## **4\. Items That Cross the Interface**
+
+### **4.1 Investigation Result**
+
+**Direction:** Claim Investigation → Integration
+
+**Description:**  
+The result produced after Claim Investigation evaluates a checkable claim using available public project artifacts.
+
+**Characteristics:**
+
+• Must be associated with the claim that was investigated.  
+• Must include a clear investigation outcome.  
+• Must preserve enough information for Integration to associate the result with the original report.  
+• Proposed data format: Structured machine-readable data, preferably JSON.  
+• Claim identifier: The result should include the same unique claim identifier received by Claim Investigation.  
+• Proposed outcome values: supported, contradicted, or insufficient evidence.  
+• Transfer timing/frequency: Each time Claim Investigation completes investigation of a claim or determines that the claim cannot be fully investigated.
+
+### **4.2 Evidence**
+
+**Direction:** Claim Investigation → Integration
+
+**Description:**  
+Public project artifacts used to support the investigation result.
+
+Evidence may include:
+
+• Source code files  
+• File paths  
+• Documentation  
+• Git commit or version history information  
+• Public issues or pull requests  
+• Repository URLs  
+• Other publicly inspectable project artifacts
+
+Each evidence item should be associated with the claim and investigation result it supports.
+
+**Proposed required information:**
+
+• Evidence type  
+• Evidence reference, path, or URL  
+• Short explanation of relevance to the claim
+
+### **4.3 Unable-to-Check Information**
+
+**Direction:** Claim Investigation → Integration
+
+**Description:**  
+Information describing cases where Claim Investigation cannot fully evaluate a claim using the available evidence.
+
+**Characteristics:**
+
+• Must identify the affected claim.  
+• Must explain why the claim could not be fully checked.
+
+Examples may include:
+
+• Referenced file or code element does not exist.  
+• Referenced version cannot be identified.  
+• Required project artifact is unavailable.  
+• Available evidence is insufficient to support or contradict the claim.  
+• Claim is ambiguous or lacks enough information for investigation.
+
+## **5\. Responsibilities**
+
+### **5.1 Claim Investigation Provides**
+
+• An investigation result for each claim it investigates.  
+• A clear outcome indicating whether the available evidence supports, contradicts, or is insufficient to determine the claim.  
+• Inspectable evidence or references supporting the investigation result.  
+• The claim identifier needed to connect the result to the originating claim.  
+• A clear explanation when a claim cannot be fully investigated.
+
+### **5.2 Claim Investigation Expects**
+
+• Integration to accept and preserve the relationship provided between each claim, its investigation result, and its evidence.  
+• Integration to preserve uncertainty or unable-to-check information rather than converting it into a definitive result.  
+• Feedback when investigation output cannot be accepted under the agreed interface.
+
+### **5.3 Integration Provides**
+
+• Confirmation that the investigation result format can be accepted and incorporated into the final system output.  
+• Feedback when an investigation result cannot be received or connected to the correct claim.  
+• Preservation of evidence references when presenting findings to the maintainer.
+
+### **5.4 Integration Expects**
+
+• A consistent machine-readable result format.  
+• A unique claim identifier for each result.  
+• A clear investigation outcome.  
+• Evidence supporting the result when evidence is available.  
+• A reason when a claim could not be fully checked.
+
+**Responsibility boundary:** Claim Investigation is responsible for the content of its investigation results, including evidence and explanations. Integration is responsible for connecting and preserving those results without changing their meaning. Integration does not correct investigation conclusions or create missing evidence.
+
+## **6\. Interface Requirements**
+
+| ID | Requirement | Traces to | Notes |
+| :---- | :---- | :---- | :---- |
+| CI-IN-01 | Claim Investigation shall provide Integration with an investigation result for each completed claim investigation. | R1, R2 |  |
+| CI-IN-02 |  Each investigation result shall preserve the identifier of the claim that produced it. | R1 |  |
+| CI-IN-03 | Each investigation result shall include inspectable evidence supporting the finding when such evidence is available. | R3 |  |
+| CI-IN-04 | Claim Investigation shall identify when a claim could not be fully checked and provide the reason. |  R4  |  |
+| CI-IN-05 | Integration shall preserve the association between each investigation result and its supporting evidence. | R2, R3  |  |
+| CI-IN-06 |  Integration shall preserve unable-to-check or insufficient-evidence information when constructing the maintainer-facing output. |  R4 |  |
+
+## **7\. Verification**
+
+| Requirement ID | Method | Performed by | Results |
+| :---- | :---- | :---- | :---- |
+| CI-IN-01 | Test  | Claim Investigation \+ Integration | Verify that a completed investigation result can be successfully transferred to Integration.  |
+| CI-IN-02 | Inspection / Test | Both subsystems | Verify that the claim identifier is preserved from Claim Investigation output through Integration |
+| CI-IN-03 | Inspection  | Both subsystem owners | Verify that evidence references remain associated with the correct investigation result.  |
+| CI-IN-04 | Test | Claim Investigation \+ Integration  | Provide a claim that cannot be fully investigated and verify that the reason is transferred correctly.  |
+| CI-IN-05 | Demonstration / Test  | Integration | Demonstrate that Integration can associate evidence with the correct claim result without ambiguity. |
+| CI-IN-06 | Test | Both subsystems | Verify that an insufficient-evidence or unable-to-check result is preserved in the final integrated output. |
+
+## **8\. Open Items**
+
+The following items still require joint confirmation by Claim Investigation and Integration:
+
+• Final machine-readable data format.  
+• Exact field names and schema.  
+• Final investigation outcome values.  
+• Required versus optional evidence fields.  
+• Missing-value behavior.  
+• How multiple evidence items are represented.  
+• Whether Integration returns an acknowledgment or error response.  
+• Exact transfer mechanism between Claim Investigation and Integration.  
+• Whether one result object is produced per claim or multiple findings may be produced for one claim.
