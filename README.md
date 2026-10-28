@@ -6,7 +6,9 @@ Start with the [statement of work](https://invisible-work-initiative.github.io/p
 
 ## Documents
 
-- [Draft system requirements](documentation/system-requirements.md)
+Where a new document goes: [where to put documents](documentation/README.md).
+
+- [System requirements (draft)](documentation/system-requirements.md)
 - [Interface management](documentation/interface-agreements.md)
 - [Branch rules for `main`](.github/rulesets/README.md)
 
@@ -14,13 +16,13 @@ Start with the [statement of work](https://invisible-work-initiative.github.io/p
 
 Our team name is Bugs26. You will see it on GitHub and in Slack. The team is divided into subsystems:
 
-| Subsystem | Responsible engineers | Slack channel |
-|---|---|---|
-| Software Systems | Raveena, Zhouran | `#bugs26-systems` |
-| Input Evaluation | Julian, Lurui | `#bugs26-evaluators` |
-| Claim Investigation | Boyu, Qinyue | `#bugs26-investigators` |
-| Integration | Andy, Meshaal | `#bugs26-integrators` |
-| Writing | Raveena, Andy | `#bugs26-writers` |
+| Subsystem | Responsible engineers | Slack channel | Folder |
+|---|---|---|---|
+| Software Systems | Raveena, Zhouran | `#bugs26-systems` | [software-systems](documentation/subsystems/software-systems/) |
+| Input Evaluation | Julian, Lurui | `#bugs26-evaluators` | [input-evaluation](documentation/subsystems/input-evaluation/) |
+| Claim Investigation | Boyu, Qinyue | `#bugs26-investigators` | [claim-investigation](documentation/subsystems/claim-investigation/) |
+| Integration | Andy, Meshaal | `#bugs26-integrators` | [integration](documentation/subsystems/integration/) |
+| Writing | Raveena, Andy | `#bugs26-writers` | Writes in the folders above |
 
 ## Meetings
 
@@ -69,7 +71,7 @@ Each subsystem posts a short written update in `#bugs26` every week, before its 
 - AI tools are expected. You are accountable for everything you submit.
 - Write a [decision record](https://invisible-work-initiative.github.io/resources/decision-record/) for every decision worth remembering.
 - Each subsystem writes its own [working agreement](https://invisible-work-initiative.github.io/resources/working-agreement/).
-- The team decides where interface agreements, decision records, and working agreements live in this repository.
+- Put interface agreements, decision records, and working agreements where [this page](documentation/README.md) says.
 
 ## Joining
 
@@ -77,5 +79,5 @@ Each subsystem posts a short written update in `#bugs26` every week, before its 
 2. Accept the invitation John sends, which adds you to the Bugs26 team.
 3. Join Slack: [https://join.slack.com/t/invisiblework/shared_invite/zt-4a6adzuvq-RAxIdcb7qvcpiEohTg4rXw](https://join.slack.com/t/invisiblework/shared_invite/zt-4a6adzuvq-RAxIdcb7qvcpiEohTg4rXw)
 4. Finish onboarding with a pull request to `CONTRIBUTORS.md` in the [onboarding repository](https://github.com/invisible-work-initiative/onboarding).
-5. Write your subsystem's working agreement.
+5. Write your subsystem's working agreement in your [subsystem folder](documentation/README.md).
 6. Post your first weekly update.
