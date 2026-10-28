@@ -29,4 +29,4 @@ For each interface on the list, the two subsystems fill out the interface agreem
 
 ## Organize the agreements
 
-The team decides where in this repository to keep the agreements and the interface list, and how to name the files. Record that decision in a [decision record](https://invisible-work-initiative.github.io/resources/decision-record/) so that everyone can find them.
+Agreements live in [interfaces](interfaces/). One file per interface, named after the two subsystems, for example `input-evaluation-integration.md`. That choice is [decision 0001](../decisions/0001-repository-document-organization.md).
