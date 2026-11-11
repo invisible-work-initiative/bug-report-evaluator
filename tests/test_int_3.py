@@ -12,6 +12,6 @@ class RecordingEvaluator:
 def test_ie_receives_original_and_structured(good):
     ie = RecordingEvaluator()
     pipeline.run(good, "paste", evaluator=ie)
-    assert ie.raw.original_text == good
+    assert ie.raw.original_body == good
     assert ie.structured.title == "Crash when parsing empty config file"
     assert ie.raw.report_id == ie.structured.report_id

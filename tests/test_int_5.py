@@ -4,5 +4,4 @@ from bugs26.integration import pipeline
 
 def test_findings_from_both_subsystems(good):
     out = pipeline.run(good, "paste")
-    sources = {f.source for f in out.findings}
-    assert sources == {"input_evaluation", "claim_investigation"}
+    assert {f.source for f in out.findings} == {"input_evaluation", "claim_investigation"}

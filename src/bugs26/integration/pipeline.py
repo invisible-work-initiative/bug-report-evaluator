@@ -14,14 +14,17 @@ class InputEvaluator(Protocol):
 
 
 def run(text: str, source: str, repo_url: Optional[str] = None,
+        title: Optional[str] = None, issue_url: Optional[str] = None,
         evaluator: Optional[InputEvaluator] = None,
         investigator: Optional[ClaimInvestigator] = None) -> MaintainerOutput:
-    """receive (INT-1) -> structure (INT-2) -> IE (INT-3) -> CI (INT-4) -> collect (INT-5,7,8) -> output (INT-6)."""
+    """receive (INT-1) -> structure + check (INT-2) -> IE (INT-3) -> CI if routed (INT-4)
+    -> collect (INT-5,7,8) -> output (INT-6). Raises PreparationError if the report can't be prepared."""
     evaluator = evaluator or StubInputEvaluator()
     investigator = investigator or StubClaimInvestigator()
-    raw = intake.receive(text, source, repo_url)
+    raw = intake.receive(text, source, repo_url, title, issue_url)
     structured = intake.structure(raw)
+    intake.verify_structured(raw, structured)
     ie = evaluator.evaluate(raw, structured)
     ci = route.to_investigation(raw, structured, ie, investigator)
     findings = assemble.collect(raw.report_id, ie, ci)
-    return assemble.build_output(raw.report_id, raw.sha256, findings)
+    return assemble.build_output(raw, structured, ie, ci, findings)

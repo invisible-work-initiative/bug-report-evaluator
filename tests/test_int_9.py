@@ -2,15 +2,21 @@
 import re
 from pathlib import Path
 
-from bugs26.integration import models, pipeline
+from bugs26.integration import github, models, pipeline
+from bugs26.web import __main__ as runner
 
 SRC = Path(models.__file__).resolve().parents[1]
-IDENTITY = re.compile(r"author|reporter|user|username|login|email|ip_addr", re.I)
+IDENTITY = re.compile(r"author|reporter|user|username|login|email|ip_addr|assignee", re.I)
+
+
+def all_models():
+    return [c for c in vars(models).values() if isinstance(c, type) and issubclass(c, models.BaseModel)
+            and c is not models.BaseModel]
 
 
 def test_no_model_has_an_identity_field():
-    for cls in (models.RawReport, models.StructuredReport, models.Finding, models.Evidence,
-                models.InvestigationRequest, models.IEResult, models.CIResult, models.MaintainerOutput):
+    assert len(all_models()) >= 10
+    for cls in all_models():
         for name in cls.model_fields:
             assert not IDENTITY.search(name), f"{cls.__name__}.{name}"
 
@@ -29,12 +35,27 @@ def test_output_has_no_identity_keys(good):
     assert not [k for k in keys(out) if IDENTITY.search(k)]
 
 
+def test_github_user_never_reaches_a_model(monkeypatch):
+    payload = {"title": "T", "body": "## Steps\nx", "html_url": "https://github.com/o/r/issues/1",
+               "user": {"login": "SECRETNAME"}, "assignees": [{"login": "SECRETNAME"}]}
+    monkeypatch.setattr(github, "_http_get", lambda u: payload)
+    got = github.fetch_issue("https://github.com/o/r/issues/1")
+    out = pipeline.run(got["body"], "github", got["repo_url"], title=got["title"], issue_url=got["issue_url"])
+    assert "SECRETNAME" not in out.model_dump_json() and "SECRETNAME" not in str(got)
+
+
 def test_two_submissions_share_no_identifier(good):
     a, b = pipeline.run(good, "paste"), pipeline.run(good, "paste")
-    assert a.report_id != b.report_id
     ids_a = {a.report_id, *(f.finding_id for f in a.findings)}
     ids_b = {b.report_id, *(f.finding_id for f in b.findings)}
     assert not ids_a & ids_b
+
+
+def test_runner_turns_access_log_off(monkeypatch):
+    seen = {}
+    monkeypatch.setattr(runner.uvicorn, "run", lambda *a, **kw: seen.update(kw))
+    runner.main()
+    assert seen["access_log"] is False
 
 
 def test_code_neither_logs_nor_writes_files():

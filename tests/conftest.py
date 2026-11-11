@@ -3,6 +3,7 @@ from pathlib import Path
 import pytest
 
 SAMPLES = Path(__file__).resolve().parent.parent / "samples"
+NAMES = ["good-report.md", "missing-steps.md", "cites-nonexistent-file.md"]
 
 
 def sample(name: str) -> str:

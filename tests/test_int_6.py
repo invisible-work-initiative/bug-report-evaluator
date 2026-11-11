@@ -10,10 +10,12 @@ def test_output_includes_collected_findings_and_r4(good):
     assert len(out.findings) > 0
     assert sum(out.summary.values()) == len(out.findings)
     assert out.could_not_check  # R4: always present
+    assert out.original_body == good and out.structured.report_id == out.report_id
+    assert "Claim Investigation is a placeholder: no code was examined" in out.could_not_check
 
 
 def test_output_reaches_maintainer_interface(good):
     r = TestClient(app).post("/api/evaluate", data={"text": good})
     assert r.status_code == 200
     body = r.json()
-    assert len(body["findings"]) > 0 and body["could_not_check"]
+    assert len(body["findings"]) > 0 and body["could_not_check"] and body["ie_decision"] == "investigate"
