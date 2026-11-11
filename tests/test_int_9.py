@@ -15,7 +15,7 @@ def all_models():
 
 
 def test_no_model_has_an_identity_field():
-    assert len(all_models()) >= 10
+    assert len(all_models()) >= 9
     for cls in all_models():
         for name in cls.model_fields:
             assert not IDENTITY.search(name), f"{cls.__name__}.{name}"

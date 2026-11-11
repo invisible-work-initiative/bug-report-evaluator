@@ -36,7 +36,7 @@ def assert_nothing_lost(raw, s):
 @pytest.mark.parametrize("name", NAMES)
 def test_span_invariant_on_samples(name):
     raw, s = structured(sample(name))
-    for sec in all_sections(s) + s.code_references + s.versions:
+    for sec in all_sections(s):
         assert raw.original_body[sec.start:sec.end] == sec.text
     assert raw.original_body == sample(name)
     assert_nothing_lost(raw, s)
@@ -48,9 +48,6 @@ def test_good_report():
     assert list(texts(s)) == ["description", "steps_to_reproduce", "expected_behavior",
                               "observed_behavior", "environment"]
     assert texts(s)["steps_to_reproduce"][0].startswith("1. Run `touch config.yaml`")
-    refs = [r.text for r in s.code_references]
-    assert "src/mytool/config.py:88" in refs and "load_config()" in refs
-    assert "v2.4.1" in [v.text for v in s.versions]
 
 
 def test_missing_steps_sample():
@@ -59,7 +56,6 @@ def test_missing_steps_sample():
     assert texts(s)["expected_behavior"] == ["The exported PDF contains all pages of the document."]
     assert texts(s)["observed_behavior"][0].startswith("Only the first page")
     assert texts(s)["environment"][0].startswith("1.8.0 on macOS 14")
-    assert s.code_references == []
 
 
 # name: (body, expected {field: [section texts]})   (title is always None unless given)
@@ -110,7 +106,14 @@ CASES = {
     "C# heading": ("# Crash in C#\nbody", {}),
     "startup, versioning and preversion are unknown": (
         "## Startup\nx\n## Versioning notes\ny\n## Preversion\nz", {}),
-    "one-liner": ("it is broken", {}),
+    "freeform text without markers is the description": ("it is broken", {"description": ["it is broken"]}),
+    "freeform with a fence and a note": ("Crash.\n**Note:** x\n```\n# Expected\n```", {"description": ["Crash.\n**Note:** x\n```\n# Expected\n```"]}),
+    "OBS-style version heading": ("## OBS Studio Version\n32.0.1\n## Operating System Info\nWin", {"environment": ["32.0.1", "Win"]}),
+    "Ollama and Kubernetes version headings": ("### Ollama version\n0.5\n### Kubernetes version\n1.30", {"environment": ["0.5", "1.30"]}),
+    "ansible-style headings": ("### Summary\ns\n### Issue Type\nBug\n### OS / Environment\nLinux\n### Steps to Reproduce\nx\n### Expected Results\ny\n### Actual Results\nz",
+                               {"description": ["s"], "environment": ["Linux"], "steps_to_reproduce": ["x"], "expected_behavior": ["y"], "observed_behavior": ["z"]}),
+    "current behavior and what is the issue": ("## What is the issue?\na\n## Current Behavior\nb", {"description": ["a"], "observed_behavior": ["b"]}),
+    "single-word suffix only for version": ("## Release summary\nx\n## Python version\n3.12\n## Bug platform\ny", {"environment": ["3.12"]}),
     "alias as whole-word prefix": ("## Steps to reproduce the issue\nx", {"steps_to_reproduce": ["x"]}),
     "alias as whole-word suffix": (
         "## Pandas issue description\nboom\n## The installed versions\nv", {"description": ["boom"], "environment": ["v"]}),
@@ -151,13 +154,8 @@ def test_comment_only_section_is_not_meaningful():
     assert intake.meaningful_text(Section(text="<!-- unclosed", start=0, end=0)) == ""
 
 
-def test_line_numbers():
-    body = "a\r\nb\rc\n\nd"
-    assert [intake.line_of(body, i) for i in (0, 3, 5, 7, 8)] == [1, 2, 3, 4, 5]
-
-
 # Real-world issue-form shapes: which headings must map to which fields.
-KUBERNETES = ("### What happened?\n\ncrash\n\n### What did you expect to happen?\n\nno crash\n\n"
+KUBERNETES = ("### Kubernetes version\n\n1.30\n\n### What happened?\n\ncrash\n\n### What did you expect to happen?\n\nno crash\n\n"
               "### How can we reproduce it (as minimally and precisely as possible)?\n\n1. do it\n\n"
               "### Anything else we need to know?\n\nno\n\n### OS version\n\n```console\nLinux\n```\n")
 GRAFANA = ("### What happened?\n\ncrash\n\n### What did you expect to happen?\n\nno crash\n\n"
@@ -169,7 +167,7 @@ PANDAS = ("### Pandas version checks\n\n- [x] checked\n\n### Reproducible Exampl
 @pytest.mark.parametrize("body, expected", [
     (KUBERNETES, {"observed_behavior": ["What happened"], "expected_behavior": ["What did you expect to happen?"],
                   "steps_to_reproduce": ["How can we reproduce it (as minimally and precisely as possible)?"],
-                  "environment": ["OS version"]}),
+                  "environment": ["Kubernetes version", "OS version"]}),
     (GRAFANA, {"observed_behavior": ["What happened"], "expected_behavior": ["What did you expect to happen?"],
                "steps_to_reproduce": ["How do we reproduce it?"]}),
     (PANDAS, {"steps_to_reproduce": ["Reproducible Example"], "description": ["Issue Description"],
@@ -184,15 +182,21 @@ def test_issue_form_fixtures(body, expected):
     assert_nothing_lost(raw, s)
 
 
-def test_regex_fixes():
-    _, s = structured("IP 192.168.1.1, v1.2.3 and 4.5.6.\nsee https://github.com/o/r/blob/main/a/b.py and src/b.py "
-                      "and `foo()` and bar()")
-    assert [v.text for v in s.versions] == ["v1.2.3", "4.5.6"]
-    assert [r.text for r in s.code_references] == ["src/b.py", "foo()", "bar()"]
-
-
 def test_verify_catches_a_wrong_span():
     raw, s = structured("## Steps\nabc")
     s.fields["steps_to_reproduce"][0].text = "abd"
     with pytest.raises(intake.PreparationError):
         intake.verify_structured(raw, s)
+
+
+def test_no_response_and_comments_count_as_empty():
+    _, s = structured("### Steps\n_No response_\n### Expected\n<!-- fill in -->\n### Actual\nboom")
+    assert [intake.meaningful_text(x) for f in s.fields.values() for x in f] == ["", "", "boom"]
+
+
+def test_unrecognised_headings_are_reported():
+    from bugs26.integration import pipeline
+    out = pipeline.run("## Etapes\nun\n## Resultat\ndeux", "paste")
+    assert "No headings were recognised (non-English or non-standard template?)" in out.could_not_check
+    ok = pipeline.run("## Steps\nx", "paste")
+    assert not any("No headings" in c for c in ok.could_not_check)

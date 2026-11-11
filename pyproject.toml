@@ -23,6 +23,7 @@ where = ["src"]
 
 [tool.setuptools.package-data]
 "bugs26.web" = ["templates/*.html"]
+"bugs26.integration" = ["supported_repos.txt"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

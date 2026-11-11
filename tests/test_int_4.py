@@ -30,9 +30,9 @@ def test_ci_receives_request_with_context(good):
     (req,) = ci.requests
     assert req.claim_id == "c0" and req.claim_text == "load_config() crashes" and req.location == {"start": 1, "end": 5}
     assert req.context["repo_url"] == "https://github.com/o/r"
-    assert "v2.4.1" in req.context["versions"]
-    assert any("Ubuntu 22.04" in e for e in req.context["environment"])
-    assert "src/mytool/config.py:88" in req.context["code_references"]
+    assert set(req.context["fields"]) == {"description", "steps_to_reproduce", "expected_behavior",
+                                          "observed_behavior", "environment"}
+    assert "Ubuntu 22.04" in req.context["fields"]["environment"][0]
     assert req.ie_context == {"mine": [1, 2]}  # untouched
     assert "CI limit" in out.could_not_check
 
@@ -56,3 +56,22 @@ def test_uc3_ci_skipped_without_requests(good):
     out = pipeline.run(good, "paste", evaluator=evaluator(n_requests=0), investigator=ci)
     assert ci.requests == []
     assert "No specific bug claim was identified" in out.could_not_check
+
+
+def test_ci_failure_is_reported_and_the_run_continues(good):
+    class Boom:
+        def investigate(self, request):
+            raise RuntimeError("cannot reach repo")
+    out = pipeline.run(good, "paste", evaluator=evaluator(n_requests=2), investigator=Boom())
+    assert out.could_not_check.count("Claim Investigation failed: RuntimeError: cannot reach repo") == 2
+    assert out.findings == [] and out.ie_decision == "investigate"
+
+
+def test_ie_failure_stops_with_an_error(good):
+    from bugs26.integration.intake import PreparationError
+
+    class Boom:
+        def evaluate(self, raw, structured):
+            raise KeyError("x")
+    with pytest.raises(PreparationError, match="Input Evaluation failed: KeyError"):
+        pipeline.run(good, "paste", evaluator=Boom())

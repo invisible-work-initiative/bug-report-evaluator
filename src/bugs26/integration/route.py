@@ -1,13 +1,7 @@
 """INT-4: send investigation requests, with report context, to Claim Investigation."""
-from typing import Protocol
-
+from .interfaces import ClaimInvestigator
 from .intake import meaningful_text
-from .models import CIResult, IEResult, InvestigationRequest, RawReport, StructuredReport
-
-
-class ClaimInvestigator(Protocol):
-    """Interface Claim Investigation implements. Real CI code replaces the stub."""
-    def investigate(self, request: InvestigationRequest) -> CIResult: ...
+from .models import CIResult, IEResult, RawReport, StructuredReport
 
 
 def to_investigation(raw: RawReport, structured: StructuredReport,
@@ -22,17 +16,17 @@ def to_investigation(raw: RawReport, structured: StructuredReport,
     if not ie.investigation_requests:
         return CIResult(report_id=raw.report_id, not_checked=["No specific bug claim was identified"])
 
-    context = {
-        "repo_url": raw.repo_url,
-        "issue_url": raw.issue_url,
-        "versions": [v.text for v in structured.versions],
-        "environment": [meaningful_text(s) for s in structured.fields.get("environment", []) if meaningful_text(s)],
-        "code_references": [r.text for r in structured.code_references],
-    }
+    context = {"repo_url": raw.repo_url, "issue_url": raw.issue_url,
+               "fields": {name: [meaningful_text(s) for s in sections if meaningful_text(s)]
+                          for name, sections in structured.fields.items()}}
     result = CIResult(report_id=raw.report_id)
     for request in ie.investigation_requests:
         request = request.model_copy(update={"context": context})  # ie_context stays as IE sent it
-        answer = investigator.investigate(request)
+        try:
+            answer = investigator.investigate(request)
+        except Exception as e:  # CI failing must not hide IE's findings (R4): report it and go on
+            result.not_checked.append(f"Claim Investigation failed: {type(e).__name__}: {str(e)[:200]}")
+            continue
         result.findings.extend(answer.findings)
         result.not_checked.extend(n for n in answer.not_checked if n not in result.not_checked)
     return result

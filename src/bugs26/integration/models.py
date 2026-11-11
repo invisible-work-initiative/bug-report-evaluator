@@ -28,21 +28,12 @@ class Section(BaseModel):
     end: int
 
 
-class Ref(BaseModel):
-    """A code reference or version found in the body. original_body[start:end] == text."""
-    text: str
-    start: int
-    end: int
-
-
 class StructuredReport(BaseModel):
     """INT-2: everything is an exact slice of the original. Nothing is added or dropped."""
     report_id: str
     title: Optional[str] = None
-    fields: dict[str, list[Section]] = Field(default_factory=dict)  # description/steps/expected/observed/environment
+    fields: dict[str, list[Section]] = Field(default_factory=dict)  # description, steps_to_reproduce, expected_behavior, observed_behavior, environment
     unmapped: list[Section] = Field(default_factory=list)  # preamble and unknown headings
-    code_references: list[Ref] = Field(default_factory=list)
-    versions: list[Ref] = Field(default_factory=list)
 
 
 class Evidence(BaseModel):
@@ -52,8 +43,6 @@ class Evidence(BaseModel):
     excerpt: Optional[str] = None
     start: Optional[int] = None  # span in original_body, for report_excerpt
     end: Optional[int] = None
-    line_start: Optional[int] = None  # 1-based lines of that span
-    line_end: Optional[int] = None
 
 
 class Finding(BaseModel):

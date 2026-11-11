@@ -1,4 +1,4 @@
-# Integration Subsystem Prototype (iteration 3)
+# Integration Subsystem Prototype (iteration 4)
 
 A small, in-memory prototype of the **Integration** subsystem of the bug report evaluator. It takes a bug report (pasted, uploaded as `.md`/`.txt`, or fetched from a public GitHub issue URL), preserves and structures it, runs Input Evaluation, routes to Claim Investigation when appropriate, and returns the combined findings to the maintainer as an HTML page or JSON.
 
@@ -34,9 +34,21 @@ paste / .md,.txt upload / GitHub issue URL                 web/app.py (+ integra
 
 **Routing rule (BRE-DR.11):** Claim Investigation is called only if IE's decision is `investigate` AND IE sent at least one request. If the decision is `request_more_information` or `do_not_investigate`, CI is skipped and "Claims not investigated: <reason>" is shown under Could not check. If the decision is `investigate` but there are no requests, "No specific bug claim was identified" is shown.
 
-**Structuring (`intake.structure`):** a section starts at a markdown heading or at a bold label line (`**Expected:** text`). Markers inside ``` / ~~~ fences (closing fence: same character, at least as long) and inside `<!-- ... -->` comments are ignored. A bold label followed by text counts only if it has a colon (`**Expected:** x` yes, `**Expected** it to open...` no); bold counts only for known labels. `## Expected: it should save` keeps the text after the colon as the section text. Labels match known aliases exactly, as a whole-word prefix, or (multi-word aliases only) as a whole-word suffix, never as a mid-word substring. GitHub issue-form headings are covered (`What happened?` is observed, `What did you expect to happen?`, `How can we reproduce it`, `Reproducible Example`, `Installed Versions`, ...). Sections with no body are kept (label kept, empty span); a section holding only HTML comments counts as not written (`meaningful_text`). Repeated sections are all kept; unknown headings and preamble go to `unmapped`. Lines split like `str.splitlines` (lone CR works). Edges are trimmed by moving the span, never by changing text. The title is only the GitHub issue title (`original_title`); pasted or uploaded reports have none.
+**Structuring (`intake.structure`):** a section starts at a markdown heading or at a bold label line (`**Expected:** text`). Markers inside ``` / ~~~ fences (closing fence: same character, at least as long) and inside `<!-- ... -->` comments are ignored. A bold label followed by text counts only if it has a colon (`**Expected:** x` yes, `**Expected** it to open...` no); bold counts only for known labels. `## Expected: it should save` keeps the text after the colon as the section text. Labels match known aliases exactly, as a whole-word prefix, or (multi-word aliases, plus `version`/`versions` for environment) as a whole-word suffix, never as a mid-word substring. GitHub issue-form headings are covered (`What happened?` is observed, `What did you expect to happen?`, `How can we reproduce it`, `Reproducible Example`, `Installed Versions`, ...). Sections with no body are kept (label kept, empty span); a section holding only HTML comments counts as not written (`meaningful_text`). A report with no markers at all (freeform text) is mapped entirely to `description`; if there are headings but none is recognised, could-not-check says so. `_No response_` (GitHub forms) counts as empty. Repeated sections are all kept; unknown headings and preamble go to `unmapped`. Lines split like `str.splitlines` (lone CR works). Edges are trimmed by moving the span, never by changing text. The title is only the GitHub issue title (`original_title`); pasted or uploaded reports have none.
 
-**Evidence (R3):** each report excerpt carries char span and 1-based line numbers; the result page links them to the line in the original report view.
+**Evidence (R3):** a report excerpt carries its char span (`start`/`end`); the result page computes the line numbers from it and links them to the line in the original report view. Integration does not extract code references or versions: finding claims is Input Evaluation's job (the placeholder IE does it with a regex).
+
+**Supported repositories (INT-1):** GitHub issues are accepted only from the repositories in `src/bugs26/integration/supported_repos.txt` (one `owner/repo` per line, `#` comments, case-insensitive). Add a line and restart to support another.
+
+**Failures:** if Claim Investigation raises, the failure goes to could-not-check ("Claim Investigation failed: ...") and the run continues. If Input Evaluation raises, the maintainer gets an error page, never a fake result.
+
+## Plugging in your subsystem
+
+1. Implement `InputEvaluator` or `ClaimInvestigator` from `src/bugs26/integration/interfaces.py` (one method each).
+2. Return the models from `integration/models.py`; set `report_id` on every finding and request; cite evidence; fill `not_checked`.
+3. Try it: `pipeline.run(text, "paste", evaluator=MyIE(), investigator=MyCI())`.
+4. Make it the default by changing the two defaults in `integration/pipeline.py`.
+5. Run `pytest`. The interface agreements in `documentation/interfaces/` list the tests to re-run against your code.
 
 **Could not check (R4):** IE limits + CI limits + `Section '<label>' not mapped to a known field`. Missing sections are reported by the IE findings, not repeated here.
 
@@ -57,7 +69,7 @@ paste / .md,.txt upload / GitHub issue URL                 web/app.py (+ integra
 
 ## Placeholders / not done
 
-- `stubs/input_evaluation_stub.py`: only checks that description, steps, expected, observed and environment sections exist (C1-C5). C6 (evidence) and C7 (clarity) are always `unable_to_judge`. Decision is a simple rule on section presence and code references. Content quality is not judged.
+- `stubs/input_evaluation_stub.py`: only checks that description, steps, expected, observed and environment sections exist (C1-C5). C6 (evidence) and C7 (clarity) are always `unable_to_judge`. Decision is a simple rule on section presence and code references. Content quality is not judged. It also finds the code references (claims) by regex.
 - `stubs/claim_investigation_stub.py`: returns `could_not_check` for every request and says no code was examined.
 - Their findings are labelled `[PLACEHOLDER ...]`.
 - `intake.structure` is rule-based and will miss unusual formats; unmatched text stays visible under `unmapped`, missing parts are listed as "No ... section found", nothing is guessed.

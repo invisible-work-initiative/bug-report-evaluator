@@ -5,7 +5,7 @@ import uuid
 from datetime import datetime, timezone
 from typing import Optional
 
-from .models import RawReport, Ref, Section, StructuredReport
+from .models import RawReport, Section, StructuredReport
 
 
 class PreparationError(ValueError):
@@ -31,19 +31,19 @@ def receive(body: str, source: str, repo_url: Optional[str] = None,
 
 # --- labels -----------------------------------------------------------------------------------
 
-FIELDS = ["description", "steps_to_reproduce", "expected_behavior", "observed_behavior", "environment"]
 _ALIASES = {
-    "description": ["describe the bug", "bug description", "issue description", "description", "summary"],
+    "description": ["describe the bug", "bug description", "issue description", "what is the issue", "description", "summary"],
     "steps_to_reproduce": ["steps to reproduce", "to reproduce", "reproduction steps", "repro steps",
                            "how to reproduce", "how can we reproduce", "how do we reproduce",
                            "reproducible example", "steps"],
     "expected_behavior": ["expected behavior", "expected behaviour", "expected result", "expected results",
                           "what did you expect", "expected"],
     "observed_behavior": ["actual behavior", "actual behaviour", "actual result", "actual results",
-                          "observed behavior", "observed behaviour", "actual", "observed",
+                          "observed behavior", "observed behaviour", "current behavior", "current behaviour",
+                          "actual", "observed",
                           "what happened instead", "what happened"],
     "environment": ["environment", "desktop", "smartphone", "system info", "system information",
-                    "installed versions", "os version", "provide environment information",
+                    "installed versions", "os version", "os environment", "provide environment information",
                     "version", "versions", "platform"],
 }
 
@@ -54,13 +54,13 @@ def _normalize(label: str) -> str:
 
 
 def field_for(label: str) -> Optional[str]:
-    """Exact alias, alias as a whole-word prefix, or (multi-word aliases only) whole-word suffix.
+    """Exact alias, alias as a whole-word prefix, or (multi-word aliases, plus version/versions) whole-word suffix.
     Longest alias wins. Never a mid-word substring match."""
     norm = _normalize(label)
     best, best_len = None, 0
     for field, aliases in _ALIASES.items():
         for alias in aliases:
-            hit = norm == alias or norm.startswith(alias + " ") or (" " in alias and norm.endswith(" " + alias))
+            hit = norm == alias or norm.startswith(alias + " ") or ((" " in alias or alias in ("version", "versions")) and norm.endswith(" " + alias))
             if hit and len(alias) > best_len:
                 best, best_len = field, len(alias)
     return best
@@ -76,12 +76,8 @@ _COMMENT = re.compile(r"<!--.*?(?:-->|\Z)", re.S)
 
 def meaningful_text(section) -> str:
     """Section text without HTML comments and edge whitespace. Empty = nothing was written."""
-    return _COMMENT.sub("", section.text).strip()
-
-
-def line_of(body: str, offset: int) -> int:
-    """1-based line number of a character offset (same line splitting as str.splitlines)."""
-    return len((body[:offset] + "x").splitlines())
+    text = _COMMENT.sub("", section.text).strip()
+    return "" if text == "_No response_" else text  # GitHub form placeholder
 
 
 def _trim(body: str, start: int, end: int) -> tuple[int, int]:
@@ -133,35 +129,13 @@ def _marker(text: str, pos: int):
     return None
 
 
-_EXT = "py|js|jsx|ts|tsx|java|c|h|cpp|go|rs|rb|php|cs|kt|swift|json|ya?ml|toml|md|html|css"
-_CODE = re.compile(
-    rf"`(?P<tick>[\w.]+(?:\(\))?)`"                       # `identifier` or `name()`
-    rf"|(?P<path>(?:[\w.-]+/)*[\w-]+\.(?:{_EXT})\b(?::\d+)?)"  # foo/bar.py, a.js:42
-    rf"|(?P<call>\b[A-Za-z_][\w.]*\(\))")                  # name()
-_VERSION = re.compile(r"(?<![\w.])v?\d+\.\d+\.\d+(?![\w]|\.\d)")
-_URL = re.compile(r"https?://\S+")
-
-
-def _find_refs(body: str, regex, group=None) -> list[Ref]:
-    """Unique matches (by text, first occurrence), skipping anything inside a URL."""
-    urls = [m.span() for m in _URL.finditer(body)]
-    refs, seen = [], set()
-    for m in regex.finditer(body):
-        name = next((g for g in (group or [None]) if g and m.group(g)), None)
-        start, end = m.span(name) if name else m.span()
-        if any(u0 <= start < u1 for u0, u1 in urls) or body[start:end] in seen:
-            continue
-        seen.add(body[start:end])
-        refs.append(Ref(text=body[start:end], start=start, end=end))
-    return refs
-
-
 def structure(raw: RawReport) -> StructuredReport:
     """INT-2: split the body into sections. Each Section is an exact slice (start/end) of the body."""
     body = raw.original_body
     markers = _markers(body)
-    pieces = []  # (label, field, start, end)
-    pieces.append((None, None, 0, markers[0]["line_start"] if markers else len(body)))
+    # No markers at all: a freeform report. The whole text is the description.
+    pieces = [("description" if not markers else None, "description" if not markers else None, 0,
+               markers[0]["line_start"] if markers else len(body))]
     for i, m in enumerate(markers):
         end = markers[i + 1]["line_start"] if i + 1 < len(markers) else len(body)
         pieces.append((m["label"], m["field"], m["value_start"], end))
@@ -183,8 +157,6 @@ def structure(raw: RawReport) -> StructuredReport:
         title=raw.original_title,
         fields=fields,
         unmapped=unmapped,
-        code_references=_find_refs(body, _CODE, ["tick", "path", "call"]),
-        versions=_find_refs(body, _VERSION),
     )
 
 
@@ -192,12 +164,9 @@ def verify_structured(raw: RawReport, structured: StructuredReport) -> None:
     """Preparation check (FMEA F.1): every span must be an exact slice of the original.
     Raises PreparationError so the run stops instead of showing a wrong result."""
     body = raw.original_body
-    if not body.strip():
-        raise PreparationError("The report body is empty.")
     if structured.report_id != raw.report_id:
         raise PreparationError("Structured report belongs to a different report.")
     spans = [s for secs in structured.fields.values() for s in secs] + structured.unmapped
-    spans += structured.code_references + structured.versions
     for s in spans:
         if not (0 <= s.start <= s.end <= len(body)) or body[s.start:s.end] != s.text:
             raise PreparationError(f"Structured text at {s.start}-{s.end} does not match the original report.")

@@ -2,10 +2,14 @@
 import json
 import os
 import re
+from pathlib import Path
 import urllib.error
 import urllib.request
 
 _ISSUE_URL = re.compile(r"^https://github\.com/(?P<owner>[\w.-]+)/(?P<repo>[\w.-]+)/issues/(?P<number>\d+)/?", re.ASCII)
+
+
+SUPPORTED_FILE = Path(__file__).with_name("supported_repos.txt")
 
 
 class GitHubError(ValueError):
@@ -20,10 +24,14 @@ def _http_get(url: str) -> dict:
     try:
         with urllib.request.urlopen(urllib.request.Request(url, headers=headers), timeout=10) as resp:
             return json.loads(resp.read().decode("utf-8"))
-    except urllib.error.HTTPError as e:
-        raise GitHubError(f"GitHub returned HTTP {e.code} for this issue.") from None
-    except (urllib.error.URLError, TimeoutError, ValueError):
-        raise GitHubError("Could not reach GitHub.") from None
+    except (urllib.error.URLError, TimeoutError, ValueError) as e:  # HTTPError is a URLError
+        raise GitHubError(f"Could not get this issue from GitHub ({getattr(e, 'code', type(e).__name__)}).") from None
+
+
+def supported_repos() -> set[str]:
+    """INT-1: the repositories we accept, lower case, from supported_repos.txt."""
+    lines = (l.strip().lower() for l in SUPPORTED_FILE.read_text(encoding="utf-8").splitlines())
+    return {l for l in lines if l and not l.startswith("#")}
 
 
 def fetch_issue(issue_url: str) -> dict:
@@ -32,6 +40,9 @@ def fetch_issue(issue_url: str) -> dict:
     if not m or {m.group("owner"), m.group("repo")} & {".", ".."}:
         raise GitHubError("Not a GitHub issue URL. Expected https://github.com/OWNER/REPO/issues/NUMBER.")
     owner, repo, number = m.group("owner", "repo", "number")
+    if f"{owner}/{repo}".lower() not in supported_repos():
+        raise GitHubError(f"{owner}/{repo} is not a supported repository. To add one, put 'owner/repo' on a new "
+                          "line in src/bugs26/integration/supported_repos.txt and restart.")
     data = _http_get(f"https://api.github.com/repos/{owner}/{repo}/issues/{number}")
     if not isinstance(data, dict):
         raise GitHubError("Unexpected answer from GitHub.")

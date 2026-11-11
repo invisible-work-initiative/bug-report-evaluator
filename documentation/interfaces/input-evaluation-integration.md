@@ -11,7 +11,7 @@ This is a proposal from Integration. The Input Evaluation team should amend it.
   - Integration: Meshaal Aldawood, @meshaalaldawood
   - Input Evaluation: TBD — Input Evaluation (Julian or Lurui)
 - **Status:** draft
-- **Version:** 0.1
+- **Version:** 0.2
 - **Date:** 2026-11-11
 
 ## 1 Purpose and scope
@@ -30,7 +30,7 @@ Out of scope: how IE judges quality, and how IE finds claims.
 - [Interface management](../interface-agreements.md)
 - [Claim Investigation - Integration agreement](claim-investigation-integration.md)
 - Team design notes: IF02, IF03 (to IE) and IF04, IF05 (from IE)
-- Code: `src/bugs26/integration/models.py`, `src/bugs26/integration/pipeline.py`, `src/bugs26/stubs/input_evaluation_stub.py`
+- Code: `src/bugs26/integration/models.py`, `src/bugs26/integration/interfaces.py`, `src/bugs26/integration/pipeline.py`, `src/bugs26/stubs/input_evaluation_stub.py`
 
 ## 3 Interface description
 
@@ -58,7 +58,7 @@ sequenceDiagram
 
 - Format: JSON matching the pydantic models in `src/bugs26/integration/models.py`.
 - Frequency: once per report.
-- Connection method: in-process Python call, `InputEvaluator.evaluate(raw, structured) -> IEResult`. The Protocol is in `src/bugs26/integration/pipeline.py`. The stub in `src/bugs26/stubs/input_evaluation_stub.py` is a placeholder. The real IE code replaces it.
+- Connection method: in-process Python call, `InputEvaluator.evaluate(raw, structured) -> IEResult`. The Protocol is in `src/bugs26/integration/interfaces.py`. The stub in `src/bugs26/stubs/input_evaluation_stub.py` is a placeholder. The real IE code replaces it: pass it as `evaluator=` to `pipeline.run`, or change the default there.
 
 `RawReport`
 
@@ -69,7 +69,7 @@ sequenceDiagram
 | `original_body` | string | The report text, verbatim. |
 | `sha256` | string | Hash of title (or empty string), a newline, and body. |
 | `received_at` | datetime | When Integration received it (UTC). |
-| `source` | `paste`, `upload` or `github` | How the report arrived. |
+| `source` | `paste`, `upload` or `github` | How the report arrived. GitHub reports are accepted only from repositories listed in `src/bugs26/integration/supported_repos.txt`. |
 | `repo_url` | string or null | Repository URL, GitHub source only. |
 | `issue_url` | string or null | Issue URL, GitHub source only. |
 
@@ -83,8 +83,8 @@ There is no field for the reporter (INT-9).
 | `title` | string or null | The original title. Never derived. |
 | `fields` | map of string to list of `Section` | Sections by field name: `description`, `steps_to_reproduce`, `expected_behavior`, `observed_behavior`, `environment`. A name can hold more than one section. |
 | `unmapped` | list of `Section` | Preamble and sections with an unknown heading. |
-| `code_references` | list of `Ref` | Code references found in the body. |
-| `versions` | list of `Ref` | Version strings found in the body. |
+
+A report with no headings at all (freeform text) has its whole text in `description`. Integration does not extract code references or versions. IE finds the claims it needs, in `original_body`.
 
 `Section`
 
@@ -93,13 +93,6 @@ There is no field for the reporter (INT-9).
 | `label` | string or null | Heading text as written. Null if there is none. |
 | `text` | string | Section text. |
 | `start`, `end` | integer | Character span. `original_body[start:end] == text`. |
-
-`Ref`
-
-| Field | Type | Meaning |
-|---|---|---|
-| `text` | string | The reference text. |
-| `start`, `end` | integer | Character span in `original_body`. |
 
 ### 4.2 IEResult (IE to Integration)
 
@@ -144,8 +137,7 @@ There is no field for the reporter (INT-9).
 | `kind` | `report_excerpt`, `file`, `url` or `note` | Type of evidence. |
 | `ref` | string | Source reference. Passed on unchanged (INT-8). |
 | `excerpt` | string or null | Quoted text. |
-| `start`, `end` | integer or null | Span in `original_body`, for `report_excerpt`. |
-| `line_start`, `line_end` | integer or null | 1-based lines of that span. |
+| `start`, `end` | integer or null | Span in `original_body`, for `report_excerpt`. The result page computes line numbers from it. |
 
 `InvestigationRequest`
 
@@ -175,6 +167,8 @@ There is no field for the reporter (INT-9).
 - Cite evidence for every finding.
 - State what it could not check in `not_checked`.
 - Add no reporter identity to any item.
+
+If `evaluate` raises, Integration stops and shows "Input Evaluation failed" with the error type. It does not show a partial result.
 
 ## 6 Interface requirements
 
@@ -206,11 +200,11 @@ There is no field for the reporter (INT-9).
 
 Each item: owner TBD, target before Gate 2 (2026-12-07).
 
-1. Who extracts claims, IE or Integration? Integration proposes IE does. IE returns them in `investigation_requests`, with `location` (IF05).
+1. Claim extraction. Integration no longer extracts code references or versions. The placeholder IE does it with a regex. Real IE returns claims in `investigation_requests`, with `location` (IF05). IE should confirm.
 2. Claim granularity. What counts as one claim? One sentence, one statement, one code reference? Integration proposes one checkable statement per request.
 3. Decision vocabulary. The prototype uses `investigate`, `request_more_information`, `do_not_investigate`. The design notes talk of "sufficient". IE should confirm or change the values.
 4. Preparation issues (IF03). The prototype does not send IE a list of parts it could not map. Should it? Integration proposes adding a field to `StructuredReport`.
-5. Timeouts. How long may `evaluate` take? What does Integration do if it fails or does not return?
+5. Timeouts. How long may `evaluate` take? A raised exception is handled (error page). A call that does not return is not.
 6. Python package or HTTP service. Integration proposes an in-process Python package that implements the `InputEvaluator` Protocol. If IE needs a service, the format and error handling must be defined.
 7. Field names in `StructuredReport.fields`. IE should confirm which sections it needs (IF11).
 
@@ -219,3 +213,4 @@ Each item: owner TBD, target before Gate 2 (2026-12-07).
 | Version | Date | Author | Change |
 |---|---|---|---|
 | 0.1 | 2026-11-11 | Integration | First draft, proposed by Integration. |
+| 0.2 | 2026-11-11 | Integration | Code references and versions moved to IE. Protocols moved to `interfaces.py`. Evidence has no line fields. Supported repositories, freeform rule and IE failure handling added. |

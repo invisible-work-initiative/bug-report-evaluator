@@ -14,7 +14,10 @@ def collect(report_id: str, ie: IEResult, ci: CIResult) -> list[Finding]:
 
 def parse_gaps(structured: StructuredReport) -> list[str]:
     """What Integration itself could not map (R4)."""
-    return [f"Section '{s.label}' not mapped to a known field" for s in structured.unmapped if s.label]
+    gaps = [f"Section '{s.label}' not mapped to a known field" for s in structured.unmapped if s.label]
+    if gaps and not structured.fields:
+        gaps.append("No headings were recognised (non-English or non-standard template?)")
+    return gaps
 
 
 def build_output(raw: RawReport, structured: StructuredReport, ie: IEResult, ci: CIResult,
