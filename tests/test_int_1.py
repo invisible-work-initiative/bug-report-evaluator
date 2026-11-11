@@ -16,7 +16,7 @@ def test_sample_report_is_received_verbatim(good):
     raw = intake.receive(good, "upload", "https://github.com/o/r")
     assert raw.raw_body == good and raw.title == ""
     assert raw.sha256 == hashlib.sha256(("\n" + good).encode()).hexdigest()
-    assert raw.report_id and raw.source == "upload" and raw.repository == "o/r"
+    assert raw.request_id and raw.source == "upload" and raw.repository == "o/r"
     # not a GitHub issue: nothing is made up (IE open question Q3); body_source is always "current"
     assert (raw.issue_number, raw.issue_url, raw.created_at, raw.updated_at) == (None, None, None, None)
     assert raw.body_source == "current" and raw.labels == []
@@ -30,7 +30,7 @@ def test_crlf_is_kept_and_title_is_hashed():
 
 def test_each_submission_gets_its_own_ids(good):
     a, b = intake.receive(good, "paste"), intake.receive(good, "paste")
-    assert len({a.report_id, b.report_id, a.request_id, b.request_id, a.snapshot_id, b.snapshot_id}) == 6
+    assert len({a.request_id, b.request_id, a.snapshot_id, b.snapshot_id}) == 4
 
 
 def test_empty_body_is_valid():

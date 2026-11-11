@@ -9,6 +9,7 @@ from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from ..integration import github, pipeline
 from ..integration.intake import InputEvaluationError
+from ..integration.models import CRITERIA
 
 MAX_BYTES = 200 * 1024        # one report
 MAX_REQUEST = 256 * 1024      # whole request (Content-Length)
@@ -25,6 +26,7 @@ def short(text: Optional[str]) -> str:
 
 
 templates.env.filters["short"] = short
+templates.env.globals["CRITERIA"] = CRITERIA
 
 
 @app.exception_handler(StarletteHTTPException)
@@ -81,7 +83,7 @@ def index(request: Request):
 def evaluate(request: Request, text: str = Form(""), issue_url: str = Form(""), repo_url: str = Form(""),
              file: Optional[UploadFile] = File(None)):
     output = _evaluate(text, file, issue_url, repo_url)
-    link = output.issue_url if (output.issue_url or "").startswith("https://github.com/") else None
+    link = output.record.issue_url if (output.record.issue_url or "").startswith("https://github.com/") else None
     return templates.TemplateResponse(request, "result.html", {"output": output, "issue_link": link})
 
 

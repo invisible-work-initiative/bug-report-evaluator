@@ -54,7 +54,6 @@ def test_span_invariant_on_samples(name):
 
 def test_good_report():
     _, s = structured(sample("good-report.md"))
-    assert s.title == ""  # pastes and uploads have no separate title
     assert list(texts(s)) == ["bug_description", "steps_to_reproduce", "expected_behavior",
                               "observed_behavior", "environment_version"]
     assert texts(s)["steps_to_reproduce"][0].startswith("1. Run `touch config.yaml`")
@@ -70,7 +69,7 @@ def test_missing_steps_sample():
     assert texts(s)["environment_version"][0].startswith("1.8.0 on macOS 14")
 
 
-# name: (body, expected {concept: [section values]})   (title is always "" unless given)
+# name: (body, expected {concept: [section values]})
 CASES = {
     "bold note mid-steps stays in steps": (
         "## Steps to reproduce\n1. a\n**Note:** flaky\n2. b\n## Expected\nok",
@@ -142,13 +141,11 @@ def test_adversarial_cases(case):
     body, expected = CASES[case]
     raw, s = structured(body)
     assert texts(s) == expected
-    assert s.title == ""
     assert_nothing_lost(raw, s)
 
 
 def test_ie_draft_example_a1():
-    """Appendix A.1 of the IE draft: same sections, statuses, concepts and lines (the last, empty section's end line
-    is the heading line here; the draft's example says 12)."""
+    """Appendix A.1 of the IE draft: same sections, statuses, concepts and lines (also the last, blank section: 11-12)."""
     body = ("### What happened?\nThe Save dialog shows Error E42 after clicking Save.\n### Steps to reproduce\n"
             "Open a new document, type hello, then click Save.\n### Expected behavior\nThe document should be saved.\n"
             "### Version\n2.3.1 on Windows 11.\n### Evidence\nError E42: write failed.\n### Additional details\n")
@@ -161,7 +158,7 @@ def test_ie_draft_example_a1():
         ("s3", "Expected behavior", "provided", "The document should be saved.", "recognized", "expected_behavior", (5, 6)),
         ("s4", "Version", "provided", "2.3.1 on Windows 11.", "recognized", "environment_version", (7, 8)),
         ("s5", "Evidence", "provided", "Error E42: write failed.", "recognized", "supporting_evidence", (9, 10)),
-        ("s6", "Additional details", "blank", "", "unrecognized", None, (11, 11)),
+        ("s6", "Additional details", "blank", "", "unrecognized", None, (11, 12)),
     ]
 
 
@@ -176,7 +173,7 @@ def test_preamble_is_not_a_section_and_unknown_headings_are_diagnosed():
     assert [(x.original_label, x.value, x.recognition, x.semantic_concept) for x in s.sections] == [
         ("Foo", "img", "unrecognized", None), ("Steps", "x", "recognized", "steps_to_reproduce")]
     assert "Hello there" in raw.raw_body and not any("Hello there" in (x.value or "") for x in s.sections)
-    assert [d.code for d in s.extraction.diagnostics] == ["preamble_not_a_section", "unrecognized_headings"]
+    assert s.extraction.mode == "structured" and s.extraction.diagnostics == []  # `recognition` says what was not matched
     _, s = structured("# Conversion fails\nIt fails.")
     assert [(x.original_label, x.value) for x in s.sections] == [("Conversion fails", "It fails.")]
 
@@ -195,11 +192,9 @@ def test_lines_split_on_lf_and_crlf_is_one_break():
     assert [(x.source_lines.start, x.source_lines.end) for x in s.sections] == [(2, 4), (5, 6)]
 
 
-def test_explicit_title_is_kept_and_nothing_is_derived():
-    _, s = structured("# Heading\n## Steps\nx", title="Given")
-    assert s.title == "Given"
-    _, s = structured("# Heading\n## Steps\nx")
-    assert s.title == ""
+def test_title_is_never_derived_from_the_body():
+    assert structured("# Heading\n## Steps\nx")[0].title == ""
+    assert structured("x", title="Given")[0].title == "Given"
 
 
 def test_comment_only_section_is_not_meaningful_to_the_stub():
@@ -247,7 +242,7 @@ def test_verify_catches_a_wrong_span():
 def test_verify_catches_wrong_lines_label_and_status():
     for change in (lambda x: setattr(x, "source_lines", IELines(start=1, end=1)),   # value is on line 2
                    lambda x: setattr(x, "source_lines", IELines(start=2, end=2)),   # label is on line 1
-                   lambda x: setattr(x, "original_label", ""),
+                   lambda x: setattr(x, "original_label", "Other"),
                    lambda x: setattr(x, "status", "blank")):
         raw, s = structured("## Steps\nabc")
         change(s.sections[0])
@@ -261,8 +256,9 @@ def test_no_response_is_provided_text_only_the_stub_ignores_it():
     assert [meaningful_text(x) for x in s.sections] == ["", "", "boom"]
 
 
-def test_unrecognised_headings_go_to_extraction_not_to_the_maintainer():
+def test_all_headings_unrecognized_is_an_unsupported_template():
     out = pipeline.run("## Etapes\nun\n## Resultat\ndeux", "paste")
-    codes = [d.code for d in out.structured.extraction.diagnostics]
-    assert "no_headings_recognised" in codes and "unrecognized_headings" in codes
+    ext = out.record.extraction
+    assert ext.mode == "unsupported_template" and [d.code for d in ext.diagnostics] == ["no_headings_recognised"]
+    assert [s.recognition for s in out.record.sections] == ["unrecognized", "unrecognized"]  # still sent: they are valid input
     assert not any("Etapes" in c or "recognised" in c for c in out.could_not_check)  # D6: IE reads the raw text

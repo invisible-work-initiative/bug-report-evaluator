@@ -1,4 +1,4 @@
-# Integration Subsystem Prototype (iteration 6)
+# Integration Subsystem Prototype (iteration 7)
 
 A small, in-memory prototype of the **Integration** subsystem of the bug report evaluator. It takes a bug report (pasted, uploaded as `.md`/`.txt`, or fetched from a public GitHub issue URL), preserves and structures it, runs Input Evaluation, sends each identified claim to Claim Investigation, and returns the combined results to the maintainer as an HTML page or JSON.
 
@@ -30,13 +30,13 @@ Set `GITHUB_TOKEN` to raise GitHub's rate limit (optional).
 
 ```
 paste / .md,.txt upload / GitHub issue URL                 web/app.py (+ integration/github.py)
-  -> intake.receive()            INT-1   RawReport: title + raw_body verbatim, report_id/request_id/snapshot_id, GitHub metadata
+  -> intake.receive()            INT-1   RawReport: title + raw_body verbatim, request_id (the INT-7 key) and snapshot_id, GitHub metadata
   -> intake.structure()          INT-2   StructuredReport: IE-style sections (exact slices of raw_body, 1-based source_lines)
   -> intake.verify_structured()  INT-2   every value, line range and label must check out, else PreparationError (run stops)
   -> InputEvaluator.evaluate()   INT-3   one IEReportRecord (raw_body + sections) -> IEResult
   -> route.match_ie()            INT-5   request_id + snapshot_id must match, C1-C7 once each, else InputEvaluationError (502)
   -> route.to_investigation()    INT-4   one CIRequest per identified claim -> ClaimInvestigator.investigate() -> CIResult
-  -> assemble.build_output()     INT-5..8  MaintainerOutput: IEResult and CIResults passed through unchanged, could_not_check
+  -> assemble.build_output()     INT-5..8  MaintainerOutput: the snapshot (IEReportRecord), IEResult and CIResults passed through unchanged, could_not_check
   -> HTML page / JSON            INT-6
 ```
 
@@ -45,7 +45,7 @@ paste / .md,.txt upload / GitHub issue URL                 web/app.py (+ integra
 **Structuring (`intake.structure`):** a section starts at a markdown heading or a bold label line (`**Expected:** text`). Markers inside ``` / ~~~ fences (closing fence: same character, at least as long) and inside `<!-- ... -->` comments are ignored. A bold label followed by text counts only if it has a colon, and bold counts only for known labels. `## Expected: it should save` keeps the text after the colon as the value. Headings are matched to the six IE concepts (`bug_description`, `steps_to_reproduce`, `expected_behavior`, `observed_behavior`, `environment_version`, `supporting_evidence`) by known aliases: exactly, as a whole-word prefix, or (multi-word aliases, plus `version`/`versions`) as a whole-word suffix, never as a mid-word substring. Any other heading is kept as a section with `recognition: "unrecognized"` and `semantic_concept: null`.
 - `value` is the exact text under the heading, without the heading line. `provided` values have edge whitespace cut off (by moving the span); `blank` values keep the exact whitespace. `_No response_` and HTML comments are copied as they are; IE decides if they are useful.
 - A report with no headings is free-form: `sections: []`, `extraction.mode: "free_form"`. Nothing is made up. Text before the first heading is not a section; it stays in `raw_body`.
-- `source_lines` are 1-based, split on LF (a CRLF is one break). Integration's own notes (`preamble_not_a_section`, `unrecognized_headings`, `no_headings_recognised`) go to `extraction.diagnostics`. They are not maintainer gaps: IE reads the raw text.
+- `source_lines` are 1-based, split on LF (a CRLF is one break). If no heading is recognised, `extraction.mode` is `unsupported_template` with one diagnostic (`no_headings_recognised`); the sections are still sent. Unrecognized headings are not maintainer gaps: IE reads the raw text, and `recognition` says what was not matched. The snapshot (the record sent to IE) is kept for the run and is in the output JSON (decision 0007).
 - No issue template is known, so `field_id`, `required` and `template_id` are `null`, and `absent` is never sent. `body_source` is always `current` (the initial text is not available).
 - Pasted and uploaded reports have no issue number, URL or timestamps; those stay `null` and are never made up ("pending IE Q3": the IE draft requires them). The title is the GitHub issue title, `""` otherwise.
 
@@ -99,8 +99,8 @@ The IDs below come from the team's SYSEN 5100 design compendium (HW7), which is 
 
 ## Placeholders / not done
 
-- `stubs/input_evaluation_stub.py`: rates C1-C5 `P` (a section with content exists, with a quotation) or `M` (none, with an absence check); C6 and C7 are always unevaluated (`dependency_unavailable`), so the status is `partial`. For a free-form report C1-C5 are unevaluated (`unsupported_content`). Content quality is not judged. It finds the claims by regex, and pins the criteria version `git:b1820e5:documentation/bug-report-quality-criteria.md`. Its findings are labelled `[PLACEHOLDER ...]`.
-- `stubs/claim_investigation_stub.py`: returns `insufficient evidence` for every claim, with the limitation "no code was examined".
+- `stubs/input_evaluation_stub.py`: rates a criterion `P` (with a quotation) when a section for it has content, and otherwise leaves it unevaluated (`unsupported_content`): a missing heading does not mean missing information, so it never says `M`. C6 and C7 are always unevaluated (`dependency_unavailable`), so the status is `partial`. It finds claims by regex and pins the criteria version `git:b1820e5:documentation/bug-report-quality-criteria.md`. Its findings are labelled `[PLACEHOLDER ...]`, and the page says Input Evaluation is a placeholder.
+- `stubs/claim_investigation_stub.py`: raises "Claim Investigation not connected" and invents no outcome, so every claim is listed under Could not check as not investigated. The page says Claim Investigation is a placeholder.
 - `intake.structure` is rule-based and will miss unusual formats; unmatched headings stay visible as `unrecognized` sections, nothing is guessed.
 - GitHub fetch handles one issue by URL only (no webhooks, no listing, no comments). The GitHub call runs in the server's threadpool (endpoints are plain `def`) and is not cached. Owner/repo must be ASCII, `.`/`..` are refused.
 - JSON download on the result page is a `data:` link, so nothing is kept on the server.

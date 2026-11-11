@@ -19,12 +19,11 @@ class InputEvaluationError(Exception):
 def receive(body: str, source: str, repo_url: Optional[str] = None, title: Optional[str] = None,
             issue_url: Optional[str] = None, *, issue_number: Optional[int] = None, labels: Optional[list] = None,
             created_at: Optional[str] = None, updated_at: Optional[str] = None) -> RawReport:
-    """INT-1: accept a report and keep the title and body verbatim (nothing normalised). An empty body is valid.
-    Pasted/uploaded reports have no issue number, URL or timestamps; they stay None (never made up).
+    """INT-1: keep title and body verbatim; an empty body is valid. Missing GitHub fields stay None (never made up).
     body_source is always "current": the initial text is not available."""
     title = title or ""
     return RawReport(
-        report_id=str(uuid.uuid4()), request_id=str(uuid.uuid4()), snapshot_id=str(uuid.uuid4()),
+        request_id=str(uuid.uuid4()), snapshot_id=str(uuid.uuid4()),
         sha256=hashlib.sha256((title + "\n" + body).encode("utf-8")).hexdigest(),
         received_at=datetime.now(timezone.utc), source=source,
         repository="/".join(repo_url.rstrip("/").split("/")[-2:]) if repo_url else None,
@@ -35,7 +34,7 @@ def receive(body: str, source: str, repo_url: Optional[str] = None, title: Optio
 
 def to_record(raw: RawReport, structured: StructuredReport) -> IEReportRecord:
     """INT-3: the one record sent to IE: the original (raw_body) and the structured sections."""
-    return IEReportRecord(**raw.model_dump(exclude={"report_id", "sha256", "received_at", "source"}),
+    return IEReportRecord(schema_version="1.0", **raw.model_dump(exclude={"sha256", "received_at", "source"}),
                           sections=structured.sections, extraction=structured.extraction)
 
 
@@ -147,10 +146,9 @@ def _after_eol(body: str, i: int) -> int:
 
 
 def structure(raw: RawReport) -> StructuredReport:
-    """INT-2: one IE Section per heading. Each value is an exact slice of the body (offsets in `spans`).
-    No headings = a free-form report: sections [] (IE evaluates the raw text). Text before the first heading is not
-    a section; it stays in raw_body only. A "provided" value has its edge whitespace cut off by moving the span;
-    a "blank" value keeps the exact whitespace string."""
+    """INT-2: one IE Section per heading, each value an exact slice of the body (offsets in `spans`). No headings =
+    free-form: sections []. Text before the first heading stays in raw_body only. "provided" values are trimmed by
+    moving the span; "blank" values keep the exact whitespace."""
     body = raw.raw_body
     markers = _markers(body)
     sections, spans = [], {}
@@ -161,47 +159,31 @@ def structure(raw: RawReport) -> StructuredReport:
         provided = bool(body[start:end].strip())
         if provided:
             start, end = _trim(body, start, end)
-        sid = f"s{i + 1}"
-        first = _line(body, m["line_start"])
+        sid, first = f"s{i + 1}", _line(body, m["line_start"])
         sections.append(IESection(
-            section_id=sid, original_label=m["label"], status="provided" if provided else "blank",
+            section_id=sid, field_id=None, required=None, original_label=m["label"], status="provided" if provided else "blank",
             value=body[start:end], recognition="recognized" if m["field"] else "unrecognized",
             semantic_concept=m["field"],
-            source_lines=IELines(start=first, end=max(first, _line(body, end - 1)) if end > start else first)))
+            source_lines=IELines(start=first, end=max(first, _line(body, end - 1) if end > start else _line(body, end) if end == len(body) else first))))
         spans[sid] = (start, end)
 
-    diagnostics = []
-    if markers and body[:markers[0]["line_start"]].strip():
-        diagnostics.append(IEExtractionDiagnostic(code="preamble_not_a_section",
-                                        message="Text before the first heading is in raw_body only."))
-    unknown = [s.original_label for s in sections if s.recognition == "unrecognized"]
-    if unknown:
-        diagnostics.append(IEExtractionDiagnostic(code="unrecognized_headings", message="Not matched to a known concept: " + ", ".join(unknown)))
-    if sections and len(unknown) == len(sections):
-        diagnostics.append(IEExtractionDiagnostic(code="no_headings_recognised",
-                                        message="No headings were recognised (non-English or non-standard template?)"))
-    return StructuredReport(report_id=raw.report_id, title=raw.title, sections=sections, spans=spans,
-                            extraction=IEExtraction(mode="structured" if markers else "free_form", diagnostics=diagnostics))
+    mode = "free_form" if not markers else "unsupported_template" if all(x.recognition == "unrecognized" for x in sections) else "structured"
+    diagnostics = [IEExtractionDiagnostic(code="no_headings_recognised", message="No heading matched a known concept.")]         if mode == "unsupported_template" else []
+    return StructuredReport(sections=sections, spans=spans,
+                            extraction=IEExtraction(mode=mode, template_id=None, diagnostics=diagnostics))
 
 
 def verify_structured(raw: RawReport, structured: StructuredReport) -> None:
-    """Preparation check (FMEA F.1): every section value must be an exact slice of the original, inside its
-    source_lines, with a non-empty label that is on its first line. Raises PreparationError so the run stops
-    instead of showing a wrong result."""
+    """Preparation check (FMEA F.1): every value an exact slice of the original, inside its source_lines, with a
+    label on its first line. Raises PreparationError so the run stops instead of showing a wrong result."""
     body, lines = raw.raw_body, raw.raw_body.split("\n")
-    if structured.report_id != raw.report_id:
-        raise PreparationError("Structured report belongs to a different report.")
-    if structured.title != raw.title:
-        raise PreparationError("Title does not match the original report.")
-    if len({s.section_id for s in structured.sections}) != len(structured.sections):
-        raise PreparationError("Section ids are not unique.")
     for s in structured.sections:
         span, value, sl = structured.spans.get(s.section_id), s.value or "", s.source_lines
         if span is None or not (0 <= span[0] <= span[1] <= len(body)) or body[span[0]:span[1]] != value:
             raise PreparationError(f"Structured text of section {s.section_id} does not match the original report.")
         if (s.status == "provided") != bool(value.strip()) or s.status == "absent":
             raise PreparationError(f"Section {s.section_id} has the wrong status.")
-        if not s.original_label.strip() or sl is None or not 1 <= sl.start <= sl.end <= len(lines)                 or s.original_label not in lines[sl.start - 1]:
+        if sl is None or not 1 <= sl.start <= sl.end <= len(lines) or s.original_label not in lines[sl.start - 1]:
             raise PreparationError(f"Section {s.section_id} has a wrong label or line range.")
         if span[1] > span[0] and not (sl.start <= _line(body, span[0]) and _line(body, span[1] - 1) <= sl.end):
             raise PreparationError(f"Section {s.section_id}: the text is not inside its source_lines.")

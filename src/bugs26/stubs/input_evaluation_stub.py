@@ -1,24 +1,19 @@
 """PLACEHOLDER Input Evaluation. The real IE subsystem (another team) replaces this. Returns the IE draft v1 shape.
 
-It only checks whether each section exists (P / M, or unevaluated) and finds code references by regex.
+It rates a criterion P when a section for it has content, and otherwise leaves it unevaluated: a missing heading
+does not mean missing information (IE draft), so the placeholder never says M. It finds code references by regex.
 It does not judge quality. Finding claims is IE's job, not Integration's.
 """
 import re
 from datetime import datetime, timezone
 
-from ..integration.models import (IEClaim, IEClaimExtraction, IEDiagnostic, IEEvidence, IEFinding, IELines,
+from ..integration.models import (CRITERIA, IEClaim, IEClaimExtraction, IEDiagnostic, IEEvidence, IEFinding, IELines,
                                   IEProvenance, IEReportRecord, IEResult, IESection, IEUnevaluatedReason)
 
-PLACEHOLDER = "[PLACEHOLDER Input Evaluation] "
+PREFIX = "[PLACEHOLDER Input Evaluation] "
 CRITERIA_VERSION = "git:b1820e5:documentation/bug-report-quality-criteria.md"  # commit pinned in the IE draft
-CRITERIA = [  # (id, section concept, name)
-    ("C1", "bug_description", "bug description"),
-    ("C2", "steps_to_reproduce", "steps to reproduce"),
-    ("C3", "expected_behavior", "expected behavior"),
-    ("C4", "observed_behavior", "observed behavior"),
-    ("C5", "environment_version", "environment and version"),
-]
-UNJUDGED = [("C6", "supporting evidence"), ("C7", "clarity and specificity")]
+CONCEPTS = {"C1": "bug_description", "C2": "steps_to_reproduce", "C3": "expected_behavior", "C4": "observed_behavior",
+            "C5": "environment_version"}  # C6 and C7 are never judged
 
 _COMMENT = re.compile(r"<!--.*?(?:-->|\Z)", re.S)
 # code references: `token` with a letter and one of . ( _ /  |  path/file.ext[:line]  |  name()
@@ -51,34 +46,29 @@ def find_code_references(body: str) -> list[tuple[str, int, int]]:
 
 
 class StubInputEvaluator:
+    PLACEHOLDER = True
+
     def evaluate(self, record: IEReportRecord) -> IEResult:
         findings = []
-
-        def add(cid, rating, text, evidence, reason=None):
-            findings.append(IEFinding(
-                criterion_id=cid, criteria_version=CRITERIA_VERSION,
-                evaluation_status="concluded" if rating else "unevaluated", rating=rating,
-                explanation=PLACEHOLDER + text, evidence=evidence, unevaluated_reason=reason))
-
-        whole = lambda text: IEEvidence(basis="absence_check", source="whole_report", explanation=text)
-        for cid, concept, name in CRITERIA:
-            secs = [s for s in record.sections if s.semantic_concept == concept and meaningful_text(s)]
+        for cid, name in CRITERIA.items():
+            secs = [s for s in record.sections if cid in CONCEPTS and s.semantic_concept == CONCEPTS[cid] and meaningful_text(s)]
             if secs:
-                add(cid, "P", f"A {name} section is present.",
-                    [IEEvidence(basis="quotation", source="raw_body", section_id=s.section_id,
-                                lines=s.source_lines, quote=s.value, explanation=f"Text under '{s.original_label}'.")
-                     for s in secs])
-            elif record.extraction.mode == "free_form":
-                add(cid, None, "Free-form report: the placeholder only reads sections.",
-                    [IEEvidence(basis="source_reference", source="whole_report",
-                                explanation="The placeholder cannot read a report without sections.")],
-                    IEUnevaluatedReason(code="unsupported_content", message="Free-form report (no sections); the placeholder cannot evaluate it."))
+                findings.append(IEFinding(
+                    criterion_id=cid, criteria_version=CRITERIA_VERSION, evaluation_status="concluded", rating="P",
+                    explanation=PREFIX + f"{'An' if name[0] in 'AEIOU' else 'A'} {name.lower()} section is present.",
+                    unevaluated_reason=None,
+                    evidence=[IEEvidence(basis="quotation", source="raw_body", section_id=s.section_id,
+                                         lines=s.source_lines, quote=s.value, explanation=f"Text under '{s.original_label}'.")
+                              for s in secs]))
             else:
-                add(cid, "M", f"No {name} section with content was found.", [whole(f"Looked for a {name} section; none has content.")])
-        for cid, name in UNJUDGED:
-            add(cid, None, f"{name} is not judged by the placeholder.",
-                [IEEvidence(basis="source_reference", source="whole_report", explanation="Not judged.")],
-                IEUnevaluatedReason(code="dependency_unavailable", message=f"{cid} ({name}) is not judged by the placeholder."))
+                why = ("The placeholder reads only sections; a missing heading is not missing information." if cid in CONCEPTS
+                       else "The placeholder does not judge this criterion.")
+                findings.append(IEFinding(
+                    criterion_id=cid, criteria_version=CRITERIA_VERSION, evaluation_status="unevaluated", rating=None,
+                    explanation=PREFIX + f"{name} was not evaluated.", unevaluated_reason=IEUnevaluatedReason(
+                        code="unsupported_content" if cid in CONCEPTS else "dependency_unavailable", message=f"{cid}: {why}"),
+                    evidence=[IEEvidence(basis="source_reference", source="whole_report", section_id=None, lines=None,
+                                         quote=None, explanation="Not evaluated by the placeholder.")]))
 
         body, lines = record.raw_body, record.raw_body.split("\n")
         claims = []
@@ -87,6 +77,7 @@ class StubInputEvaluator:
             section = next((s.section_id for s in record.sections if s.source_lines and s.source_lines.start <= ln <= s.source_lines.end), None)
             claims.append(IEClaim(
                 claim_id=f"claim-{n}", claim_text=text, relevant_context=lines[ln - 1].rstrip("\r"),
+                named_project_versions=[],
                 source=IEEvidence(basis="quotation", source="raw_body", section_id=section,
                                   lines=IELines(start=ln, end=ln), quote=text,
                                   explanation="Code reference found in the text (placeholder regex).")))
@@ -98,10 +89,11 @@ class StubInputEvaluator:
             diagnostics.append(IEDiagnostic(severity="warning", code="not_initial_submission", path="/body_source",
                                             message="The text is the current text; later edits may be included."))
         return IEResult(
-            request_id=record.request_id, snapshot_id=record.snapshot_id,
+            schema_version="1.0", request_id=record.request_id, snapshot_id=record.snapshot_id,
             processing_status="partial" if unevaluated else "completed",
             criterion_findings=findings, unevaluated_criteria=[f.criterion_id for f in unevaluated],
-            claim_extraction=IEClaimExtraction(status="completed"),
+            claim_extraction=IEClaimExtraction(status="completed", reason=None),
             identified_claims=claims, no_checkable_claims=not claims, diagnostics=diagnostics,
             provenance=IEProvenance(criteria_version=CRITERIA_VERSION, evaluator_version="placeholder-ie/0",
+                                    external_models=[],
                                     evaluated_at=datetime.now(timezone.utc).isoformat(timespec="seconds").replace("+00:00", "Z")))

@@ -54,16 +54,17 @@ Integration builds an `IEReportRecord` with these rules. Where a rule differs fr
 - A report with no headings is free-form: `sections: []`, `extraction.mode: "free_form"`. Integration does not make up a description section.
 - Text before the first heading is not a section. It stays in `raw_body` only.
 - `absent` is never sent: no template is known, so `template_id`, `field_id` and `required` are `null`.
-- `extraction.diagnostics` carries Integration's notes: `preamble_not_a_section`, `unrecognized_headings`, `no_headings_recognised`. They are not shown to the maintainer as gaps, because IE reads the raw text.
+- If no heading is recognised, `extraction.mode` is `unsupported_template` with one diagnostic (`no_headings_recognised`), and the sections are still sent. Otherwise the mode is `structured`, or `free_form` with no sections, and `diagnostics` is empty. Unrecognized headings are not shown to the maintainer as gaps, because IE reads the raw text.
 - Before sending, Integration checks every `value` against `raw_body`, its `source_lines`, and its label (`verify_structured`). If a check fails, the run stops with an error and IE is not called.
 - `body_source` is always `current`: Integration cannot get the initial text. IE adds `not_initial_submission`.
-- `request_id` and `snapshot_id` are new for each submission. `report_id` is Integration's own link key (INT-7) and is not sent.
+- `request_id` and `snapshot_id` are new for each submission. `request_id` is also Integration's link key (INT-7); there is no separate report id.
 - Differs from the draft (pending IE question Q3): a pasted or uploaded report has no `issue_number`, `issue_url`, `created_at` or `updated_at`, and `repository` only if the maintainer entered one. These are `null`, never made up. The draft requires them. IE should say whether `null` is acceptable for this case.
 
 ### 4.2 Evaluation result (IE to Integration)
 
 - Integration matches the result to the request by `request_id` and `snapshot_id`. A mismatch, a result without exactly one finding for each of C1 to C7 (when `completed` or `partial`), or a repeated `claim_id` is a failure: the maintainer sees an error (HTTP 502), not a result. A result with `invalid_input` and a `null` `request_id` is accepted.
-- The result is passed on as received (INT-8). The maintainer output contains the `IEResult` object itself.
+- The result is passed on as received (INT-8). The maintainer output contains the `IEResult` object itself, and the snapshot (the record sent to IE), which Integration keeps for the run only (decision 0007) and which is in the downloadable JSON.
+- Before anything is routed, Integration checks the result against the draft's status table (section 4.2): statuses, `unevaluated_criteria` equal to the unevaluated findings, rating `null` exactly when unevaluated, claim `source.quote` equal to `claim_text`, `no_checkable_claims` consistent. A result that fails is an Input Evaluation failure (HTTP 502), not findings.
 - `could_not_check` (R4) is built from: `processing_status` other than `completed`; each unevaluated criterion with its reason; each `U` rating; `claim_extraction` that is not `completed`, with its reason; each `error` diagnostic; and the notes in 4.3 below.
 - `invalid_input` and `failed` are shown as a failure, never as a completed evaluation. `partial` is shown with its limits.
 - Integration has no decision field to read. IE's draft has none, so routing does not depend on one.
@@ -93,7 +94,7 @@ The requirements are IE's IF-1 to IF-12. Integration's part is IF-1, IF-2, IF-3,
 | IF-1, IF-2 | Test | `tests/test_int_1.py` (verbatim body and metadata), `tests/test_int_3.py::test_ie_receives_original_and_structured`, `test_github_metadata_is_sent` | Pass (stub) |
 | IF-3 | Test | `tests/test_int_2.py`: `test_ie_draft_example_a1`, `test_status_blank_provided_and_exact_values`, `test_freeform_has_no_sections_and_no_invented_description`, `test_lines_split_on_lf_and_crlf_is_one_break`, `test_verify_catches_a_wrong_span`, `test_verify_catches_wrong_lines_label_and_status` | Pass |
 | IF-10 | Test | `tests/test_int_8.py::test_ie_and_ci_results_pass_through_unchanged` | Pass |
-| IF-11 | Test | `tests/test_int_4.py::test_ie_answer_for_another_request_is_a_failure`, `test_ie_result_without_seven_criteria_is_a_failure`, `test_ci_skipped_and_failure_shown_when_ie_rejected_or_failed` | Pass (fakes) |
+| IF-11 | Test | `tests/test_int_4.py::test_ie_answer_for_another_request_is_a_failure`, `test_inconsistent_ie_result_is_a_failure`, `test_ci_skipped_and_failure_shown_when_ie_rejected_or_failed` | Pass (fakes) |
 | IF-12 | Inspection | [verification.md](../subsystems/integration/verification.md) | Open |
 | IF-4 to IF-9 | IE's tests (their section 7) | Run against real IE code | Open |
 
@@ -113,4 +114,4 @@ The requirements are IE's IF-1 to IF-12. Integration's part is IF-1, IF-2, IF-3,
 |---|---|---|---|
 | 0.1 | 2026-11-11 | Integration | First draft, proposed by Integration. |
 | 0.2 | 2026-11-11 | Integration | Code references and versions moved to IE. Protocols moved to `interfaces.py`. |
-| 0.3 | 2026-11-11 | Integration | Conforms to the IE draft v1. Our own record, result and decision definitions removed. This page now covers Integration's side only. |
+| 0.3 | 2026-11-11 | Integration | (Iteration 7: strict models, result consistency checks, snapshot kept for the run, `request_id` is the only key.) Conforms to the IE draft v1. Our own record, result and decision definitions removed. This page now covers Integration's side only. |

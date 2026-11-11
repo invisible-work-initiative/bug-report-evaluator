@@ -1,0 +1,524 @@
+{
+ "A.1": {
+  "schema_version": "1.0",
+  "request_id": "req-001",
+  "snapshot_id": "snap-123-a",
+  "repository": "example/editor",
+  "issue_number": 123,
+  "issue_url": "https://github.com/example/editor/issues/123",
+  "title": "Save dialog reports Error E42",
+  "raw_body": "### What happened?\nThe Save dialog shows Error E42 after clicking Save.\n### Steps to reproduce\nOpen a new document, type hello, then click Save.\n### Expected behavior\nThe document should be saved.\n### Version\n2.3.1 on Windows 11.\n### Evidence\nError E42: write failed.\n### Additional details\n",
+  "body_source": "initial",
+  "labels": [
+   "bug"
+  ],
+  "created_at": "2026-11-01T14:00:00Z",
+  "updated_at": "2026-11-01T14:00:00Z",
+  "sections": [
+   {
+    "section_id": "s1",
+    "field_id": null,
+    "original_label": "What happened?",
+    "required": null,
+    "status": "provided",
+    "value": "The Save dialog shows Error E42 after clicking Save.",
+    "recognition": "recognized",
+    "semantic_concept": "observed_behavior",
+    "source_lines": {
+     "start": 1,
+     "end": 2
+    }
+   },
+   {
+    "section_id": "s2",
+    "field_id": null,
+    "original_label": "Steps to reproduce",
+    "required": null,
+    "status": "provided",
+    "value": "Open a new document, type hello, then click Save.",
+    "recognition": "recognized",
+    "semantic_concept": "steps_to_reproduce",
+    "source_lines": {
+     "start": 3,
+     "end": 4
+    }
+   },
+   {
+    "section_id": "s3",
+    "field_id": null,
+    "original_label": "Expected behavior",
+    "required": null,
+    "status": "provided",
+    "value": "The document should be saved.",
+    "recognition": "recognized",
+    "semantic_concept": "expected_behavior",
+    "source_lines": {
+     "start": 5,
+     "end": 6
+    }
+   },
+   {
+    "section_id": "s4",
+    "field_id": null,
+    "original_label": "Version",
+    "required": null,
+    "status": "provided",
+    "value": "2.3.1 on Windows 11.",
+    "recognition": "recognized",
+    "semantic_concept": "environment_version",
+    "source_lines": {
+     "start": 7,
+     "end": 8
+    }
+   },
+   {
+    "section_id": "s5",
+    "field_id": null,
+    "original_label": "Evidence",
+    "required": null,
+    "status": "provided",
+    "value": "Error E42: write failed.",
+    "recognition": "recognized",
+    "semantic_concept": "supporting_evidence",
+    "source_lines": {
+     "start": 9,
+     "end": 10
+    }
+   },
+   {
+    "section_id": "s6",
+    "field_id": null,
+    "original_label": "Additional details",
+    "required": null,
+    "status": "blank",
+    "value": "",
+    "recognition": "unrecognized",
+    "semantic_concept": null,
+    "source_lines": {
+     "start": 11,
+     "end": 12
+    }
+   }
+  ],
+  "extraction": {
+   "mode": "structured",
+   "template_id": null,
+   "diagnostics": []
+  }
+ },
+ "A.2": {
+  "schema_version": "1.0",
+  "request_id": "req-002",
+  "snapshot_id": "snap-124-a",
+  "repository": "example/editor",
+  "issue_number": 124,
+  "issue_url": "https://github.com/example/editor/issues/124",
+  "title": "Something is wrong",
+  "raw_body": "It does not work. Please help.",
+  "body_source": "initial",
+  "labels": [],
+  "created_at": "2026-11-01T15:00:00Z",
+  "updated_at": "2026-11-01T15:00:00Z",
+  "sections": [],
+  "extraction": {
+   "mode": "free_form",
+   "template_id": null,
+   "diagnostics": []
+  }
+ },
+ "A.4": {
+  "schema_version": "1.0",
+  "request_id": "req-003",
+  "snapshot_id": "snap-124-a",
+  "processing_status": "invalid_input",
+  "criterion_findings": [],
+  "unevaluated_criteria": [],
+  "claim_extraction": {
+   "status": "not_performed",
+   "reason": "Input failed contract validation."
+  },
+  "identified_claims": [],
+  "no_checkable_claims": null,
+  "diagnostics": [
+   {
+    "severity": "error",
+    "code": "missing_required_field",
+    "path": "/raw_body",
+    "message": "raw_body is required. An empty string is allowed; omitting the field is not."
+   }
+  ],
+  "provenance": {
+   "criteria_version": null,
+   "evaluator_version": "fixture-evaluator/1",
+   "external_models": [],
+   "evaluated_at": "2026-11-10T18:00:00Z"
+  }
+ },
+ "A.5": {
+  "schema_version": "1.0",
+  "request_id": "req-001",
+  "snapshot_id": "snap-123-a",
+  "processing_status": "completed",
+  "criterion_findings": [
+   {
+    "criterion_id": "C1",
+    "criteria_version": "git:b1820e55e2f5e3a03a8888fad1a4805b3356832b:documentation/bug-report-quality-criteria.md",
+    "evaluation_status": "concluded",
+    "rating": "P",
+    "explanation": "Names the affected component (Save dialog) and the specific failure.",
+    "evidence": [
+     {
+      "basis": "quotation",
+      "source": "raw_body",
+      "section_id": "s1",
+      "lines": {
+       "start": 2,
+       "end": 2
+      },
+      "quote": "The Save dialog shows Error E42 after clicking Save.",
+      "explanation": "Component and failure stated."
+     }
+    ],
+    "unevaluated_reason": null
+   },
+   {
+    "criterion_id": "C2",
+    "criteria_version": "git:b1820e55e2f5e3a03a8888fad1a4805b3356832b:documentation/bug-report-quality-criteria.md",
+    "evaluation_status": "concluded",
+    "rating": "P",
+    "explanation": "Gives the actions and input needed to attempt reproduction.",
+    "evidence": [
+     {
+      "basis": "quotation",
+      "source": "raw_body",
+      "section_id": "s2",
+      "lines": {
+       "start": 4,
+       "end": 4
+      },
+      "quote": "Open a new document, type hello, then click Save.",
+      "explanation": "Actions and input stated."
+     }
+    ],
+    "unevaluated_reason": null
+   },
+   {
+    "criterion_id": "C3",
+    "criteria_version": "git:b1820e55e2f5e3a03a8888fad1a4805b3356832b:documentation/bug-report-quality-criteria.md",
+    "evaluation_status": "concluded",
+    "rating": "P",
+    "explanation": "States the expected outcome.",
+    "evidence": [
+     {
+      "basis": "quotation",
+      "source": "raw_body",
+      "section_id": "s3",
+      "lines": {
+       "start": 6,
+       "end": 6
+      },
+      "quote": "The document should be saved.",
+      "explanation": "Explicit expected result."
+     }
+    ],
+    "unevaluated_reason": null
+   },
+   {
+    "criterion_id": "C4",
+    "criteria_version": "git:b1820e55e2f5e3a03a8888fad1a4805b3356832b:documentation/bug-report-quality-criteria.md",
+    "evaluation_status": "concluded",
+    "rating": "P",
+    "explanation": "States the observed error.",
+    "evidence": [
+     {
+      "basis": "quotation",
+      "source": "raw_body",
+      "section_id": "s1",
+      "lines": {
+       "start": 2,
+       "end": 2
+      },
+      "quote": "The Save dialog shows Error E42 after clicking Save.",
+      "explanation": "Observed error stated."
+     }
+    ],
+    "unevaluated_reason": null
+   },
+   {
+    "criterion_id": "C5",
+    "criteria_version": "git:b1820e55e2f5e3a03a8888fad1a4805b3356832b:documentation/bug-report-quality-criteria.md",
+    "evaluation_status": "concluded",
+    "rating": "P",
+    "explanation": "Gives the application version and operating system.",
+    "evidence": [
+     {
+      "basis": "quotation",
+      "source": "raw_body",
+      "section_id": "s4",
+      "lines": {
+       "start": 8,
+       "end": 8
+      },
+      "quote": "2.3.1 on Windows 11.",
+      "explanation": "Version and OS stated."
+     }
+    ],
+    "unevaluated_reason": null
+   },
+   {
+    "criterion_id": "C6",
+    "criteria_version": "git:b1820e55e2f5e3a03a8888fad1a4805b3356832b:documentation/bug-report-quality-criteria.md",
+    "evaluation_status": "concluded",
+    "rating": "P",
+    "explanation": "Includes the exact error text.",
+    "evidence": [
+     {
+      "basis": "quotation",
+      "source": "raw_body",
+      "section_id": "s5",
+      "lines": {
+       "start": 10,
+       "end": 10
+      },
+      "quote": "Error E42: write failed.",
+      "explanation": "Exact error message is inspectable evidence."
+     }
+    ],
+    "unevaluated_reason": null
+   },
+   {
+    "criterion_id": "C7",
+    "criteria_version": "git:b1820e55e2f5e3a03a8888fad1a4805b3356832b:documentation/bug-report-quality-criteria.md",
+    "evaluation_status": "concluded",
+    "rating": "P",
+    "explanation": "Actions, affected UI, and outcome are specific.",
+    "evidence": [
+     {
+      "basis": "quotation",
+      "source": "raw_body",
+      "section_id": "s1",
+      "lines": {
+       "start": 2,
+       "end": 2
+      },
+      "quote": "The Save dialog shows Error E42 after clicking Save.",
+      "explanation": "No vague or undefined terms."
+     }
+    ],
+    "unevaluated_reason": null
+   }
+  ],
+  "unevaluated_criteria": [],
+  "claim_extraction": {
+   "status": "completed",
+   "reason": null
+  },
+  "identified_claims": [
+   {
+    "claim_id": "claim-1",
+    "claim_text": "The Save dialog shows Error E42 after clicking Save.",
+    "source": {
+     "basis": "quotation",
+     "source": "raw_body",
+     "section_id": "s1",
+     "lines": {
+      "start": 2,
+      "end": 2
+     },
+     "quote": "The Save dialog shows Error E42 after clicking Save.",
+     "explanation": "Reported behavior that can be checked against the project's code and issues."
+    },
+    "named_project_versions": [
+     "2.3.1"
+    ],
+    "relevant_context": "### What happened?\nThe Save dialog shows Error E42 after clicking Save."
+   }
+  ],
+  "no_checkable_claims": false,
+  "diagnostics": [],
+  "provenance": {
+   "criteria_version": "git:b1820e55e2f5e3a03a8888fad1a4805b3356832b:documentation/bug-report-quality-criteria.md",
+   "evaluator_version": "fixture-evaluator/1",
+   "external_models": [],
+   "evaluated_at": "2026-11-10T18:00:00Z"
+  }
+ },
+ "A.6": {
+  "schema_version": "1.0",
+  "request_id": "req-002",
+  "snapshot_id": "snap-124-a",
+  "processing_status": "completed",
+  "criterion_findings": [
+   {
+    "criterion_id": "C1",
+    "criteria_version": "git:b1820e55e2f5e3a03a8888fad1a4805b3356832b:documentation/bug-report-quality-criteria.md",
+    "evaluation_status": "concluded",
+    "rating": "M",
+    "explanation": "Uses a general term without naming a component or failure.",
+    "evidence": [
+     {
+      "basis": "quotation",
+      "source": "title",
+      "section_id": null,
+      "lines": null,
+      "quote": "Something is wrong",
+      "explanation": "General term only; no component or failure named."
+     }
+    ],
+    "unevaluated_reason": null
+   },
+   {
+    "criterion_id": "C2",
+    "criteria_version": "git:b1820e55e2f5e3a03a8888fad1a4805b3356832b:documentation/bug-report-quality-criteria.md",
+    "evaluation_status": "concluded",
+    "rating": "M",
+    "explanation": "No reproduction steps.",
+    "evidence": [
+     {
+      "basis": "absence_check",
+      "source": "whole_report",
+      "section_id": null,
+      "lines": null,
+      "quote": null,
+      "explanation": "Searched the title and body for actions, prerequisites, or inputs; none found."
+     }
+    ],
+    "unevaluated_reason": null
+   },
+   {
+    "criterion_id": "C3",
+    "criteria_version": "git:b1820e55e2f5e3a03a8888fad1a4805b3356832b:documentation/bug-report-quality-criteria.md",
+    "evaluation_status": "concluded",
+    "rating": "M",
+    "explanation": "No expected outcome.",
+    "evidence": [
+     {
+      "basis": "absence_check",
+      "source": "whole_report",
+      "section_id": null,
+      "lines": null,
+      "quote": null,
+      "explanation": "Searched the title and body for an expected result; none found."
+     }
+    ],
+    "unevaluated_reason": null
+   },
+   {
+    "criterion_id": "C4",
+    "criteria_version": "git:b1820e55e2f5e3a03a8888fad1a4805b3356832b:documentation/bug-report-quality-criteria.md",
+    "evaluation_status": "concluded",
+    "rating": "M",
+    "explanation": "Observed behavior is described only as 'does not work'.",
+    "evidence": [
+     {
+      "basis": "quotation",
+      "source": "raw_body",
+      "section_id": null,
+      "lines": {
+       "start": 1,
+       "end": 1
+      },
+      "quote": "It does not work.",
+      "explanation": "General term with no symptom, output, or error."
+     }
+    ],
+    "unevaluated_reason": null
+   },
+   {
+    "criterion_id": "C5",
+    "criteria_version": "git:b1820e55e2f5e3a03a8888fad1a4805b3356832b:documentation/bug-report-quality-criteria.md",
+    "evaluation_status": "concluded",
+    "rating": "M",
+    "explanation": "No software version or environment.",
+    "evidence": [
+     {
+      "basis": "absence_check",
+      "source": "whole_report",
+      "section_id": null,
+      "lines": null,
+      "quote": null,
+      "explanation": "Searched the title and body for a version, release, commit, or environment; none found."
+     }
+    ],
+    "unevaluated_reason": null
+   },
+   {
+    "criterion_id": "C6",
+    "criteria_version": "git:b1820e55e2f5e3a03a8888fad1a4805b3356832b:documentation/bug-report-quality-criteria.md",
+    "evaluation_status": "concluded",
+    "rating": "M",
+    "explanation": "No supporting material.",
+    "evidence": [
+     {
+      "basis": "absence_check",
+      "source": "whole_report",
+      "section_id": null,
+      "lines": null,
+      "quote": null,
+      "explanation": "Searched the title and body for error text, logs, screenshots, or other evidence; none found."
+     }
+    ],
+    "unevaluated_reason": null
+   },
+   {
+    "criterion_id": "C7",
+    "criteria_version": "git:b1820e55e2f5e3a03a8888fad1a4805b3356832b:documentation/bug-report-quality-criteria.md",
+    "evaluation_status": "concluded",
+    "rating": "M",
+    "explanation": "Relies on vague terms without defining them.",
+    "evidence": [
+     {
+      "basis": "quotation",
+      "source": "raw_body",
+      "section_id": null,
+      "lines": {
+       "start": 1,
+       "end": 1
+      },
+      "quote": "It does not work. Please help.",
+      "explanation": "'Does not work' is not explained."
+     }
+    ],
+    "unevaluated_reason": null
+   }
+  ],
+  "unevaluated_criteria": [],
+  "claim_extraction": {
+   "status": "completed",
+   "reason": null
+  },
+  "identified_claims": [],
+  "no_checkable_claims": true,
+  "diagnostics": [],
+  "provenance": {
+   "criteria_version": "git:b1820e55e2f5e3a03a8888fad1a4805b3356832b:documentation/bug-report-quality-criteria.md",
+   "evaluator_version": "fixture-evaluator/1",
+   "external_models": [],
+   "evaluated_at": "2026-11-10T18:00:00Z"
+  }
+ },
+ "A.7": {
+  "criterion_id": "C6",
+  "criteria_version": "git:b1820e55e2f5e3a03a8888fad1a4805b3356832b:documentation/bug-report-quality-criteria.md",
+  "evaluation_status": "unevaluated",
+  "rating": null,
+  "explanation": "A screenshot link is supplied, but IE could not check whether it is accessible or relevant.",
+  "evidence": [
+   {
+    "basis": "source_reference",
+    "source": "raw_body",
+    "section_id": null,
+    "lines": {
+     "start": 1,
+     "end": 1
+    },
+    "quote": null,
+    "explanation": "Screenshot link on line 1; not opened because the evidence-access service was unavailable."
+   }
+  ],
+  "unevaluated_reason": {
+   "code": "dependency_unavailable",
+   "message": "Evidence-access service unavailable; screenshot not checked."
+  }
+ }
+}

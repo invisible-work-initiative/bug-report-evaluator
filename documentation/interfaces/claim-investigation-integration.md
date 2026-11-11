@@ -54,6 +54,8 @@ Integration does not call CI, and says why in `could_not_check`, when `processin
 | `request_id` | Integration | The evaluation attempt; the same one IE got. |
 | `claim_id` | IE | With `request_id`, the claim's key. |
 | `claim_text` | IE | The exact claim. Not changed. |
+| `source` | IE | IE's quotation evidence for the claim (lines in `raw_body`). Not changed. |
+| `snapshot_id` | Integration | The snapshot the lines refer to. |
 | `relevant_context` | IE | Exact excerpt around the claim. Not changed. |
 | `named_project_versions` | IE | Versions the report states; `[]` if none. Not changed. |
 | `repository` | Integration | `owner/project`, or `null` for pasted or uploaded reports. |
@@ -80,7 +82,8 @@ Per the CI draft: a result tied to its claim, an outcome, evidence, and the reas
 - Checks that there is exactly one finding for the claim. Zero or several is a failure for this claim. Nothing is shown for it, and `could_not_check` says why.
 - Keeps the result, with its evidence, unchanged (INT-8, CI-IN-05).
 - Puts `insufficient evidence` outcomes and `limitation` text in `could_not_check` (CI-IN-06). It never turns them into a definite result.
-- If `investigate` raises, `could_not_check` says "Claim Investigation failed for claim ...", and the other claims go on.
+- If `investigate` raises, `could_not_check` says "Claim '...' not investigated: <error>", and the other claims go on. The placeholder CI raises "not connected" and invents no outcome.
+- CI results accept extra fields: the CI schema is still open.
 
 ### 4.4 Connection
 
@@ -105,7 +108,7 @@ CI's CI-IN-01 to CI-IN-06. Integration's part is CI-IN-02 (claim id kept), CI-IN
 | CI-IN-03 | Inspection | CI's evidence is shown as sent: `tests/test_int_8.py::test_ie_and_ci_results_pass_through_unchanged` | Pass (fakes) |
 | CI-IN-04 | Test | `tests/test_int_4.py::test_ci_limit_and_insufficient_evidence_reach_could_not_check` | Pass (fakes) |
 | CI-IN-05 | Test | `tests/test_int_8.py`, `tests/test_int_4.py::test_zero_or_several_findings_for_a_claim_is_a_failure` | Pass |
-| CI-IN-06 | Test | `tests/test_int_4.py::test_ci_limit_and_insufficient_evidence_reach_could_not_check`, `tests/test_web.py::test_offline_demo_sample_shows_claims_and_ci_rows` | Pass |
+| CI-IN-06 | Test | `tests/test_int_4.py::test_ci_limit_and_insufficient_evidence_reach_could_not_check`, `tests/test_web.py::test_offline_demo_sample_lists_claims_as_not_investigated` | Pass |
 
 ## 8 Open items (for the CI team)
 
@@ -126,3 +129,4 @@ CI's CI-IN-01 to CI-IN-06. Integration's part is CI-IN-02 (claim id kept), CI-IN
 | 0.1 | 2026-11-11 | Integration | First draft, proposed by Integration. |
 | 0.2 | 2026-11-11 | Integration | Context, Protocol, failure handling. |
 | 0.3 | 2026-11-11 | Integration | Conforms to the CI draft 0.2: their outcome words, one finding per claim, claim id on every result. Request to CI marked proposed. Routing is one call per IE claim; the decision-based rule (BRE-DR.11) is removed. |
+| 0.3 (iter. 7) | 2026-11-11 | Integration | Request forwards the whole IE claim (`source`) and `snapshot_id`. CI result classes accept extra fields. The placeholder CI invents no outcome. |

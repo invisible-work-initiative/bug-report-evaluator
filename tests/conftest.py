@@ -14,7 +14,8 @@ def sample(name: str) -> str:
 
 
 def ie_evidence(text="e", **kw):
-    return IEEvidence(**{"basis": "absence_check", "source": "whole_report", "explanation": text, **kw})
+    return IEEvidence(**{"basis": "absence_check", "source": "whole_report", "section_id": None, "lines": None,
+                         "quote": None, "explanation": text, **kw})
 
 
 def ie_claim(n=0, text="load_config() crashes"):
@@ -26,11 +27,12 @@ def ie_claim(n=0, text="load_config() crashes"):
 def ie_result(record, claims=(), **kw):
     """A valid IE v1 result for a record (7 concluded findings), for fake evaluators."""
     findings = [IEFinding(criterion_id=f"C{i}", criteria_version="v1", evaluation_status="concluded", rating="P",
-                          explanation="fine", evidence=[ie_evidence()]) for i in range(1, 8)]
-    base = dict(request_id=record.request_id, snapshot_id=record.snapshot_id, processing_status="completed",
-                criterion_findings=findings, claim_extraction=IEClaimExtraction(status="completed"),
-                identified_claims=list(claims), no_checkable_claims=not claims,
-                provenance=IEProvenance(criteria_version="v1", evaluator_version="fake", evaluated_at="2026-11-11T00:00:00Z"))
+                          explanation="fine", evidence=[ie_evidence()], unevaluated_reason=None) for i in range(1, 8)]
+    base = dict(schema_version="1.0", request_id=record.request_id, snapshot_id=record.snapshot_id, processing_status="completed",
+                criterion_findings=findings, claim_extraction=IEClaimExtraction(status="completed", reason=None),
+                identified_claims=list(claims), no_checkable_claims=not claims, unevaluated_criteria=[], diagnostics=[],
+                provenance=IEProvenance(criteria_version="v1", evaluator_version="fake", external_models=[],
+                                        evaluated_at="2026-11-11T00:00:00Z"))
     return IEResult(**{**base, **kw})
 
 

@@ -18,7 +18,8 @@ def test_evaluate_html_result(good):
     r = client.post("/evaluate", data={"text": good, "repo_url": "https://github.com/o/r"})
     assert r.status_code == 200
     for s in ("Input Evaluation", "Claim Investigation", "Could not check", "PLACEHOLDER", "Download JSON",
-              "Partial evaluation", "Original report", "line ", "Technical details", "C7", "Insufficient evidence"):
+              "Partial evaluation", "Original report", "line ", "Technical details", "C7 Clarity and specificity",
+              "are placeholders", "outside the current IE agreement, decision 0006", "Not investigated"):
         assert s in r.text
 
 
@@ -49,7 +50,7 @@ def test_api_errors_are_json():
 def test_bom_upload_is_decoded():
     data = b"\xef\xbb\xbf# Title here\n## Steps\nx"
     body = client.post("/api/evaluate", files={"file": ("a.md", data, "text/markdown")}).json()
-    assert body["raw_body"].startswith("# Title here") and body["structured"]["title"] == ""
+    assert body["record"]["raw_body"].startswith("# Title here") and body["record"]["title"] == ""
     assert body["source"] == "upload"
 
 
@@ -79,7 +80,7 @@ def test_github_issue_source(monkeypatch):
     monkeypatch.setattr(github, "_http_get", lambda u: {"title": "Boom", "body": "## Steps\nx",
                                                         "html_url": "https://github.com/o/r/issues/2"})
     body = client.post("/api/evaluate", data={"issue_url": "https://github.com/o/r/issues/2"}).json()
-    assert body["source"] == "github" and body["title"] == "Boom" and body["issue_url"].endswith("/issues/2")
+    assert body["source"] == "github" and body["record"]["title"] == "Boom" and body["record"]["issue_url"].endswith("/issues/2") and body["record"]["issue_number"] == 2
     r = client.post("/evaluate", data={"issue_url": "https://example.com/x"})
     assert r.status_code == 400 and "Not a GitHub issue URL" in r.text
 
@@ -92,7 +93,7 @@ def test_unsupported_repo_error_page(monkeypatch):
 
 def test_freeform_paste_has_no_sections():
     body = client.post("/api/evaluate", data={"text": "The app crashes when I click save."}).json()
-    assert body["structured"]["sections"] == [] and body["structured"]["extraction"]["mode"] == "free_form"
+    assert body["record"]["sections"] == [] and body["record"]["extraction"]["mode"] == "free_form"
     assert body["ie"]["processing_status"] == "partial" and body["ie"]["unevaluated_criteria"][0] == "C1"
 
 
@@ -163,26 +164,45 @@ def test_repo_url_is_validated_for_paste():
 
 def test_summary_banner_and_tables(good):
     r = client.post("/evaluate", data={"text": good})
-    assert "Partial evaluation" in r.text and "Claims: 3 identified, 3 investigated" in r.text
+    assert "Partial evaluation" in r.text and "Claims: 3 identified, 0 investigated" in r.text
     assert "Present 5" in r.text and "not evaluated 2" in r.text
-    assert "A bug description section is present" in r.text and "Not evaluated" in r.text
-    assert "<code>src/mytool/config.py:88</code>" in r.text and "Not investigated" not in r.text
+    assert "A bug description section is present" in r.text and "Not evaluated" in r.text and "A expected" not in r.text
+    assert "An expected behavior section is present" in r.text and r.text.count("Partial evaluation") == 1
+    assert "<code>src/mytool/config.py:88</code>" in r.text and "Not investigated" in r.text
 
 
 def test_unmapped_sections_are_not_a_maintainer_gap():
     r = client.post("/api/evaluate", data={"text": "## Foo\na\n## Bar\nb\n## Steps\nc"}).json()
     assert not any("Foo" in c for c in r["could_not_check"])
-    assert any(d["code"] == "unrecognized_headings" and "Foo, Bar" in d["message"]
-               for d in r["structured"]["extraction"]["diagnostics"])
+    assert [(s["original_label"], s["recognition"]) for s in r["record"]["sections"]] == [
+        ("Foo", "unrecognized"), ("Bar", "unrecognized"), ("Steps", "recognized")]
 
 
-def test_offline_demo_sample_shows_claims_and_ci_rows():
+def test_missing_heading_is_not_called_missing_information(good):
+    r = client.post("/api/evaluate", data={"text": "## Expected\nok"}).json()
+    c2 = r["ie"]["criterion_findings"][1]
+    assert (c2["rating"], c2["evaluation_status"]) == (None, "unevaluated")  # the stub never says M
+    assert all(f["rating"] != "M" for f in r["ie"]["criterion_findings"])
+
+
+def test_missing_or_insufficient_label_for_m(monkeypatch):
+    class MIE:
+        def evaluate(self, record):
+            res = ie_result(record)
+            res.criterion_findings[1] = res.criterion_findings[1].model_copy(update={"rating": "M"})
+            return res
+    with_evaluator(monkeypatch, MIE())
+    assert "Missing or insufficient (M)" in client.post("/evaluate", data={"text": "x"}).text
+
+
+def test_offline_demo_sample_lists_claims_as_not_investigated():
     body = client.post("/api/evaluate", data={"text": sample("issue-form-report.md")}).json()
     assert body["ie"]["processing_status"] == "partial" and len(body["ie"]["identified_claims"]) == 5
-    assert [r["findings"][0]["outcome"] for r in body["ci_results"]] == ["insufficient evidence"] * 5
+    assert body["ci_results"] == []  # the CI stub invents no outcome
+    assert sum("not investigated: NotImplementedError" in c for c in body["could_not_check"]) == 5
     assert [c for c in body["could_not_check"] if c.startswith("C")][:2] == [
-        "C6 not evaluated (dependency_unavailable): C6 (supporting evidence) is not judged by the placeholder.",
-        "C7 not evaluated (dependency_unavailable): C7 (clarity and specificity) is not judged by the placeholder."]
+        "C6 not evaluated (dependency_unavailable): C6: The placeholder does not judge this criterion.",
+        "C7 not evaluated (dependency_unavailable): C7: The placeholder does not judge this criterion."]
 
 
 def test_no_checkable_claims_is_shown():

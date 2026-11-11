@@ -1,22 +1,45 @@
 """INT-4: send one investigation request per identified claim, with report context, to Claim Investigation."""
 from .intake import InputEvaluationError
 from .interfaces import ClaimInvestigator
-from .models import CIRequest, CIResult, IEResult, RawReport
-
-CRITERIA = ["C1", "C2", "C3", "C4", "C5", "C6", "C7"]
+from .models import CRITERIA, CIRequest, CIResult, IEResult, RawReport
 
 
 def match_ie(raw: RawReport, ie: IEResult) -> None:
-    """IE draft 4.3: match the result to its request by request_id + snapshot_id; an invalid result is a failure."""
-    if ie.processing_status == "invalid_input" and ie.request_id is None:
-        return  # IE could not read the ids; matched by the call itself
-    if (ie.request_id, ie.snapshot_id) != (raw.request_id, raw.snapshot_id):
-        raise InputEvaluationError("Input Evaluation answered for another request (request_id/snapshot_id differ).")
-    if ie.processing_status in ("completed", "partial") and sorted(f.criterion_id for f in ie.criterion_findings) != CRITERIA:
-        raise InputEvaluationError("Input Evaluation result does not have exactly one finding for each of C1-C7.")
-    claim_ids = [c.claim_id for c in ie.identified_claims]
-    if len(set(claim_ids)) != len(claim_ids):
-        raise InputEvaluationError("Input Evaluation result repeats a claim_id.")
+    """IE draft 4.3 and 4.2: match the result to its request by request_id + snapshot_id, and check that it is
+    consistent with the status table. Any violation is a failure of Input Evaluation, never shown as findings."""
+    bad = lambda why: InputEvaluationError(f"Input Evaluation returned an invalid result: {why}.")
+    if not (ie.processing_status == "invalid_input" and ie.request_id is None):  # unreadable ids: matched by the call
+        if (ie.request_id, ie.snapshot_id) != (raw.request_id, raw.snapshot_id):
+            raise bad("it answers another request (request_id/snapshot_id differ)")
+    ids = [f.criterion_id for f in ie.criterion_findings]
+    unevaluated = [f.criterion_id for f in ie.criterion_findings if f.evaluation_status == "unevaluated"]
+    errors = [d for d in ie.diagnostics if d.severity == "error"]
+    ext_done = ie.claim_extraction.status == "completed"
+    if ie.processing_status in ("completed", "partial"):
+        if sorted(ids) != sorted(CRITERIA):
+            raise bad("not exactly one finding for each of C1-C7")
+    elif ids or ie.identified_claims or not errors:
+        raise bad(f"{ie.processing_status} needs no findings, no claims and an error diagnostic")
+    if ie.processing_status == "invalid_input" and ie.claim_extraction.status != "not_performed":
+        raise bad("invalid_input needs claim_extraction not_performed")
+    if ie.processing_status == "completed" and (unevaluated or not ext_done or errors):
+        raise bad("completed needs every criterion concluded, claim extraction completed and no error diagnostics")
+    if ie.processing_status == "partial" and not ((unevaluated or not ext_done) and errors):
+        raise bad("partial needs an unevaluated criterion or incomplete extraction, and an error diagnostic")
+    if ie.unevaluated_criteria != unevaluated:
+        raise bad("unevaluated_criteria does not list the unevaluated findings")
+    for f in ie.criterion_findings:
+        if (f.rating is None) != (f.evaluation_status == "unevaluated") or                 (f.unevaluated_reason is None) != (f.evaluation_status == "concluded"):
+            raise bad(f"{f.criterion_id} has a rating or unevaluated_reason that does not fit its evaluation_status")
+        if f.criteria_version != ie.provenance.criteria_version:
+            raise bad(f"{f.criterion_id} criteria_version differs from provenance")
+    if len({c.claim_id for c in ie.identified_claims}) != len(ie.identified_claims):
+        raise bad("a claim_id is repeated")
+    for c in ie.identified_claims:
+        if c.source.basis != "quotation" or c.source.quote != c.claim_text:
+            raise bad(f"claim {c.claim_id} source is not a quotation of its claim_text")
+    if ie.no_checkable_claims != (not ie.identified_claims if ext_done else None):
+        raise bad("no_checkable_claims does not fit the claims and claim_extraction status")
 
 
 def to_investigation(raw: RawReport, ie: IEResult, investigator: ClaimInvestigator) -> tuple[list[CIResult], list[str]]:
@@ -31,14 +54,14 @@ def to_investigation(raw: RawReport, ie: IEResult, investigator: ClaimInvestigat
         return [], ["No checkable claim was identified, so Claim Investigation was not called."]
     results, notes = [], []
     for claim in ie.identified_claims:
-        request = CIRequest(request_id=raw.request_id, claim_id=claim.claim_id, claim_text=claim.claim_text,
-                            relevant_context=claim.relevant_context,
+        request = CIRequest(request_id=raw.request_id, snapshot_id=raw.snapshot_id, claim_id=claim.claim_id,
+                            claim_text=claim.claim_text, source=claim.source, relevant_context=claim.relevant_context,
                             named_project_versions=claim.named_project_versions,
                             repository=raw.repository, issue_url=raw.issue_url, title=raw.title, raw_body=raw.raw_body)
         try:
             answer = investigator.investigate(request)
         except Exception as e:  # CI failing must not hide IE's findings (R4): report it and go on
-            notes.append(f"Claim Investigation failed for claim '{claim.claim_text}': {type(e).__name__}: {str(e)[:200]}")
+            notes.append(f"Claim '{claim.claim_text}' not investigated: {type(e).__name__}: {str(e)[:200]}")
             continue
         if (answer.request_id, answer.claim_id) != (request.request_id, request.claim_id):
             notes.append(f"Claim Investigation answered for another claim; nothing recorded for '{claim.claim_text}'.")

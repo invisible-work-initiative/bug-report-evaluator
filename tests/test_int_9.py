@@ -48,8 +48,8 @@ def test_github_user_never_reaches_a_model(monkeypatch):
 
 def test_two_submissions_share_no_identifier(good):
     a, b = pipeline.run(good, "paste"), pipeline.run(good, "paste")
-    ids_a = {a.report_id, a.request_id, a.snapshot_id}
-    ids_b = {b.report_id, b.request_id, b.snapshot_id}
+    ids_a = {a.record.request_id, a.record.snapshot_id}
+    ids_b = {b.record.request_id, b.record.snapshot_id}
     assert not ids_a & ids_b
 
 

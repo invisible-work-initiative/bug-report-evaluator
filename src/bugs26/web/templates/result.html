@@ -10,16 +10,18 @@ pre{white-space:pre-wrap;margin:.2rem 0;background:#f4f4f4;padding:.3rem}
 .orig td{border:0;padding:0 .5rem;font:13px monospace;white-space:pre-wrap}.orig td:first-child{color:#888;text-align:right}
 .span{color:#666;font-size:.85em}</style></head>
 <body>
-{% set RATINGS = {"P": "Present", "M": "Missing", "N/A": "Not applicable", "U": "Unclear"} %}
+{% set RATINGS = {"P": "Present", "M": "Missing or insufficient", "N/A": "Not applicable", "U": "Unclear"} %}
 {% set STATUS = {"completed": "Evaluation completed", "partial": "Partial evaluation: some parts could not be done (see Could not check)",
                  "invalid_input": "Input Evaluation rejected this report", "failed": "Input Evaluation failed"} %}
 {% set OUTCOMES = {"supported": "Supported", "contradicted": "Contradicted", "insufficient evidence": "Insufficient evidence"} %}
 {% macro where(e) %}{% if e.lines %}<a href="#L{{ e.lines.start }}">{% if e.lines.start == e.lines.end %}line {{ e.lines.start }}{% else %}lines {{ e.lines.start }}&ndash;{{ e.lines.end }}{% endif %}</a>{% elif e.source == "title" %}title{% else %}whole report{% endif %}{% endmacro %}
-{% set ie = output.ie %}
+{% set ie = output.ie %}{% set rec = output.record %}
 {% set ci = {} %}{% for r in output.ci_results %}{% set _ = ci.update({r.claim_id: r}) %}{% endfor %}
 <p><a href="/">&larr; Evaluate another report</a></p>
-<h2>{{ output.title or "Bug report" }}</h2>
+<h2>{{ rec.title or "Bug report" }}</h2>
 {% if issue_link %}<p><a href="{{ issue_link }}">{{ issue_link }}</a></p>{% endif %}
+{% if output.placeholders %}<p class="cnc">{{ output.placeholders | join(" and ") }} {{ "is a placeholder" if output.placeholders | length == 1 else "are placeholders" }}: the results below are not real evaluations.</p>{% endif %}
+{% if output.source != "github" %}<p>Source: {{ "pasted" if output.source == "paste" else "uploaded" }} report (outside the current IE agreement, decision 0006).</p>{% endif %}
 <div class="banner {{ ie.processing_status }}">{{ STATUS[ie.processing_status] }}</div>
 <h2>Summary</h2>
 <ul>
@@ -27,10 +29,9 @@ pre{white-space:pre-wrap;margin:.2rem 0;background:#f4f4f4;padding:.3rem}
 <li>Claims: {{ ie.identified_claims | length }} identified, {{ output.ci_results | length }} investigated</li>
 </ul>
 <h2>Input Evaluation</h2>
-<table><tr><th>Criterion</th><th>Rating</th><th>Status</th><th>Explanation</th><th>Evidence</th></tr>
-{% for f in ie.criterion_findings %}<tr><td>{{ f.criterion_id }}</td>
-<td class="{{ f.rating or 'NE' }}">{{ RATINGS[f.rating] if f.rating else "Not evaluated" }}{% if f.rating %} ({{ f.rating }}){% endif %}</td>
-<td>{{ f.evaluation_status }}{% if f.unevaluated_reason %} ({{ f.unevaluated_reason.code }}){% endif %}</td><td>{{ f.explanation }}</td>
+<table><tr><th>Criterion</th><th>Rating</th><th>Explanation</th><th>Evidence</th></tr>
+{% for f in ie.criterion_findings %}<tr><td>{{ f.criterion_id }} {{ CRITERIA[f.criterion_id] }}</td>
+<td class="{{ f.rating or 'NE' }}">{{ RATINGS[f.rating] if f.rating else "Not evaluated" }}{% if f.rating %} ({{ f.rating }}){% elif f.unevaluated_reason %} ({{ f.unevaluated_reason.code }}){% endif %}</td><td>{{ f.explanation }}</td>
 <td>{% for e in f.evidence %}<div>{{ e.basis }}, {{ where(e) }}{% if e.quote %}<pre>{{ e.quote | short }}</pre>{% endif %}<div class="span">{{ e.explanation }}</div></div>{% endfor %}</td></tr>
 {% endfor %}</table>
 {% if ie.diagnostics %}<p>Input Evaluation diagnostics:</p><ul>{% for d in ie.diagnostics %}<li>{{ d.severity }}: {{ d.code }}: {{ d.message }}</li>{% endfor %}</ul>{% endif %}
@@ -47,10 +48,10 @@ pre{white-space:pre-wrap;margin:.2rem 0;background:#f4f4f4;padding:.3rem}
 <h2>Could not check</h2>
 <div class="cnc"><ul>{% for item in output.could_not_check %}<li>{{ item }}</li>{% endfor %}</ul></div>
 <h2>Original report</h2>
-<table class="orig">{% for line in output.raw_body.split("\n") %}<tr id="L{{ loop.index }}"><td>{{ loop.index }}</td><td>{{ line.rstrip("\r") }}</td></tr>{% endfor %}</table>
-<p><a href="data:application/json;charset=utf-8,{{ output.model_dump_json(indent=2) | urlencode }}" download="evaluation-{{ output.report_id }}.json"><button type="button">Download JSON</button></a></p>
+<table class="orig">{% for line in rec.raw_body.split("\n") %}<tr id="L{{ loop.index }}"><td>{{ loop.index }}</td><td>{{ line.rstrip("\r") }}</td></tr>{% endfor %}</table>
+<p><a href="data:application/json;charset=utf-8,{{ output.model_dump_json(indent=2) | urlencode }}" download="evaluation-{{ rec.request_id }}.json"><button type="button">Download JSON</button></a></p>
 <details><summary>Technical details</summary>
-<p>Report <code>{{ output.report_id }}</code>, request <code>{{ output.request_id }}</code>, snapshot <code>{{ output.snapshot_id }}</code>, source: {{ output.source }}, content hash (sha256): <code>{{ output.sha256 }}</code></p>
+<p>Request <code>{{ rec.request_id }}</code>, snapshot <code>{{ rec.snapshot_id }}</code>, source: {{ output.source }}, content hash (sha256): <code>{{ output.sha256 }}</code></p>
 <p>Criteria version: <code>{{ ie.provenance.criteria_version }}</code>, evaluator: <code>{{ ie.provenance.evaluator_version }}</code>, evaluated at {{ ie.provenance.evaluated_at }}</p>
-<p>Extraction: {{ output.structured.extraction.mode }}, {{ output.structured.sections | length }} sections{% for d in output.structured.extraction.diagnostics %}<br>{{ d.code }}: {{ d.message }}{% endfor %}</p></details>
+<p>Extraction: {{ rec.extraction.mode }}, {{ rec.sections | length }} sections{% for d in rec.extraction.diagnostics %}<br>{{ d.code }}: {{ d.message }}{% endfor %}</p></details>
 </body></html>
