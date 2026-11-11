@@ -16,14 +16,14 @@ pre{white-space:pre-wrap;margin:.2rem 0;background:#f4f4f4;padding:.3rem}
 {% if output.missing_information %}<br><span style="font-weight:normal">Missing information: {{ output.missing_information | join(", ") }}</span>{% endif %}</div>
 <p>Report <code>{{ output.report_id }}</code> (source: {{ output.source }}{% if output.issue_url %}, {{ output.issue_url }}{% endif %}; sha256 <code>{{ output.sha256[:12] }}</code>)</p>
 <h2>Summary</h2>
-<ul>{% for status, n in output.summary.items() %}<li>{{ status }}: {{ n }}</li>{% endfor %}</ul>
+<ul>{% for status, items in output.findings | groupby("status") %}<li>{{ status }}: {{ items | length }}</li>{% endfor %}</ul>
 <h2>Findings</h2>
 {% for label, findings in groups %}
 <h3>{{ label }}</h3>
 {% if findings %}
 <table><tr><th>Subject</th><th>Status</th><th>Statement</th><th>Evidence</th></tr>
 {% for f in findings %}<tr><td>{{ f.subject }}</td><td class="{{ f.status }}">{{ f.status }}</td><td>{{ f.statement }}</td>
-<td>{% for e in f.evidence %}<div>{{ e.kind }}: {{ e.ref }}{% if e.start is not none %} <span class="span">(chars {{ e.start }}-{{ e.end }})</span>{% endif %}{% if e.excerpt %}<pre>{{ e.excerpt }}</pre>{% endif %}</div>{% endfor %}</td></tr>
+<td>{% for e in f.evidence %}<div>{{ e.kind }}: {{ e.ref }}{% if e.start is not none %} <span class="span">(<a href="#L{{ e.line_start }}">lines {{ e.line_start }}-{{ e.line_end }}</a>, chars {{ e.start }}-{{ e.end }})</span>{% endif %}{% if e.excerpt %}<pre>{{ e.excerpt }}</pre>{% endif %}</div>{% endfor %}</td></tr>
 {% endfor %}</table>
 {% else %}<p>No findings.</p>{% endif %}
 {% endfor %}
@@ -31,6 +31,6 @@ pre{white-space:pre-wrap;margin:.2rem 0;background:#f4f4f4;padding:.3rem}
 <div class="cnc"><ul>{% for item in output.could_not_check %}<li>{{ item }}</li>{% endfor %}</ul></div>
 <h2>Original report</h2>
 {% if output.original_title %}<p><strong>Title:</strong> {{ output.original_title }}</p>{% endif %}
-<table class="orig">{% for n, line in lines %}<tr><td>{{ n }}</td><td>{{ line }}</td></tr>{% endfor %}</table>
+<table class="orig">{% for n, line in lines %}<tr id="L{{ n }}"><td>{{ n }}</td><td>{{ line }}</td></tr>{% endfor %}</table>
 <p><a href="{{ json_uri }}" download="evaluation-{{ output.report_id }}.json"><button type="button">Download JSON</button></a></p>
 </body></html>

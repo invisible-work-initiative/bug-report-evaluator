@@ -43,13 +43,13 @@ async def input_error(request: Request, exc: InputError):
     return _error(request, exc.status, exc.message)
 
 
-async def _evaluate(text: str, file: Optional[UploadFile], issue_url: str, repo_url: str):
+def _evaluate(text: str, file: Optional[UploadFile], issue_url: str, repo_url: str):
     """Pick exactly one source (paste / upload / GitHub issue) and run the pipeline."""
     upload = b""
     if file is not None and file.filename:
         if not file.filename.lower().endswith((".md", ".txt")):
             raise InputError(400, "Only .md or .txt files are accepted.")
-        upload = await file.read(MAX_BYTES + 1)  # an empty upload is ignored
+        upload = file.file.read(MAX_BYTES + 1)  # an empty upload is ignored
     sources = [bool(text.strip()), bool(upload), bool(issue_url.strip())]
     if sum(sources) != 1:
         raise InputError(400, "Provide exactly one of: pasted text, an uploaded file, or a GitHub issue URL.")
@@ -80,18 +80,18 @@ def index(request: Request):
 
 
 @app.post("/evaluate")
-async def evaluate(request: Request, text: str = Form(""), issue_url: str = Form(""), repo_url: str = Form(""),
+def evaluate(request: Request, text: str = Form(""), issue_url: str = Form(""), repo_url: str = Form(""),
                    file: Optional[UploadFile] = File(None)):
-    output = await _evaluate(text, file, issue_url, repo_url)
+    output = _evaluate(text, file, issue_url, repo_url)
     subsystems = {"input_evaluation": "Input Evaluation", "claim_investigation": "Claim Investigation"}
     groups = [(label, [f for f in output.findings if f.source == key]) for key, label in subsystems.items()]
     json_uri = "data:application/json;charset=utf-8," + quote(json.dumps(output.model_dump(mode="json"), indent=2))
     return templates.TemplateResponse(request, "result.html", {
         "output": output, "groups": groups, "json_uri": json_uri,
-        "lines": list(enumerate(output.original_body.split("\n"), 1))})
+        "lines": list(enumerate(output.original_body.splitlines(), 1))})
 
 
 @app.post("/api/evaluate")
-async def api_evaluate(text: str = Form(""), issue_url: str = Form(""), repo_url: str = Form(""),
+def api_evaluate(text: str = Form(""), issue_url: str = Form(""), repo_url: str = Form(""),
                        file: Optional[UploadFile] = File(None)):
-    return await _evaluate(text, file, issue_url, repo_url)
+    return _evaluate(text, file, issue_url, repo_url)

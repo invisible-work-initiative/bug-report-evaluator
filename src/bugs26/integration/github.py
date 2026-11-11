@@ -5,7 +5,7 @@ import re
 import urllib.error
 import urllib.request
 
-_ISSUE_URL = re.compile(r"^https://github\.com/(?P<owner>[\w.-]+)/(?P<repo>[\w.-]+)/issues/(?P<number>\d+)/?$")
+_ISSUE_URL = re.compile(r"^https://github\.com/(?P<owner>[\w.-]+)/(?P<repo>[\w.-]+)/issues/(?P<number>\d+)/?", re.ASCII)
 
 
 class GitHubError(ValueError):
@@ -28,11 +28,13 @@ def _http_get(url: str) -> dict:
 
 def fetch_issue(issue_url: str) -> dict:
     """Return {"title", "body", "issue_url", "repo_url"} for https://github.com/{o}/{r}/issues/{n}."""
-    m = _ISSUE_URL.match(issue_url.strip())
-    if not m:
+    m = _ISSUE_URL.fullmatch(issue_url.strip())
+    if not m or {m.group("owner"), m.group("repo")} & {".", ".."}:
         raise GitHubError("Not a GitHub issue URL. Expected https://github.com/OWNER/REPO/issues/NUMBER.")
     owner, repo, number = m.group("owner", "repo", "number")
     data = _http_get(f"https://api.github.com/repos/{owner}/{repo}/issues/{number}")
+    if not isinstance(data, dict):
+        raise GitHubError("Unexpected answer from GitHub.")
     if "pull_request" in data:
         raise GitHubError("This URL is a pull request, not a bug report issue.")
     return {

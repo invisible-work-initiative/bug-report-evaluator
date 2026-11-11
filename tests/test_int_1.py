@@ -48,7 +48,10 @@ def test_pull_request_is_rejected(monkeypatch):
 
 
 @pytest.mark.parametrize("url", ["https://example.com/o/r/issues/1", "https://github.com/o/r/pull/1",
-                                 "https://github.com/o/r/issues/x", "not a url"])
+                                 "https://github.com/o/r/issues/x", "not a url",
+                                 "https://github.com/../r/issues/1", "https://github.com/o/../issues/1",
+                                 "https://github.com/o/r/issues/1\n/x", "https://github.com/\u00f6/r/issues/1",
+                                 "https://github.com/o/r/issues/\u0661\u0662", "https://github.com/o/r/issues/1?x=1"])
 def test_bad_url_is_rejected(monkeypatch, url):
     monkeypatch.setattr(github, "_http_get", lambda u: pytest.fail("no network call expected"))
     with pytest.raises(github.GitHubError):
@@ -61,3 +64,9 @@ def test_received_github_report_has_no_author(monkeypatch):
     raw = intake.receive(got["body"], "github", got["repo_url"], got["title"], got["issue_url"])
     assert "someone" not in raw.model_dump_json()
     assert "user" not in RawReport.model_fields and "author" not in RawReport.model_fields
+
+
+def test_non_object_answer_is_rejected(monkeypatch):
+    monkeypatch.setattr(github, "_http_get", lambda u: ["not", "a", "dict"])
+    with pytest.raises(github.GitHubError):
+        github.fetch_issue("https://github.com/o/r/issues/7")

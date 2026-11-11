@@ -1,4 +1,4 @@
-# Integration Subsystem Prototype (iteration 2)
+# Integration Subsystem Prototype (iteration 3)
 
 A small, in-memory prototype of the **Integration** subsystem of the bug report evaluator. It takes a bug report (pasted, uploaded as `.md`/`.txt`, or fetched from a public GitHub issue URL), preserves and structures it, runs Input Evaluation, routes to Claim Investigation when appropriate, and returns the combined findings to the maintainer as an HTML page or JSON.
 
@@ -34,7 +34,11 @@ paste / .md,.txt upload / GitHub issue URL                 web/app.py (+ integra
 
 **Routing rule (BRE-DR.11):** Claim Investigation is called only if IE's decision is `investigate` AND IE sent at least one request. If the decision is `request_more_information` or `do_not_investigate`, CI is skipped and "Claims not investigated: <reason>" is shown under Could not check. If the decision is `investigate` but there are no requests, "No specific bug claim was identified" is shown.
 
-**Structuring:** sections come from markdown headings and from a line that is only a bold label (`**Expected:**`, optionally followed by text). Bold counts only for known labels, nothing inside ``` or ~~~ fences counts, and labels match known aliases exactly or as a whole-word prefix (never as a substring). Repeated sections are all kept; unknown headings and preamble go to `unmapped`. Edges are trimmed by moving the span, never by changing text.
+**Structuring (`intake.structure`):** a section starts at a markdown heading or at a bold label line (`**Expected:** text`). Markers inside ``` / ~~~ fences (closing fence: same character, at least as long) and inside `<!-- ... -->` comments are ignored. A bold label followed by text counts only if it has a colon (`**Expected:** x` yes, `**Expected** it to open...` no); bold counts only for known labels. `## Expected: it should save` keeps the text after the colon as the section text. Labels match known aliases exactly, as a whole-word prefix, or (multi-word aliases only) as a whole-word suffix, never as a mid-word substring. GitHub issue-form headings are covered (`What happened?` is observed, `What did you expect to happen?`, `How can we reproduce it`, `Reproducible Example`, `Installed Versions`, ...). Sections with no body are kept (label kept, empty span); a section holding only HTML comments counts as not written (`meaningful_text`). Repeated sections are all kept; unknown headings and preamble go to `unmapped`. Lines split like `str.splitlines` (lone CR works). Edges are trimmed by moving the span, never by changing text. The title is only the GitHub issue title (`original_title`); pasted or uploaded reports have none.
+
+**Evidence (R3):** each report excerpt carries char span and 1-based line numbers; the result page links them to the line in the original report view.
+
+**Could not check (R4):** IE limits + CI limits + `Section '<label>' not mapped to a known field`. Missing sections are reported by the IE findings, not repeated here.
 
 ## Traceability
 
@@ -57,5 +61,5 @@ paste / .md,.txt upload / GitHub issue URL                 web/app.py (+ integra
 - `stubs/claim_investigation_stub.py`: returns `could_not_check` for every request and says no code was examined.
 - Their findings are labelled `[PLACEHOLDER ...]`.
 - `intake.structure` is rule-based and will miss unusual formats; unmatched text stays visible under `unmapped`, missing parts are listed as "No ... section found", nothing is guessed.
-- GitHub fetch handles one issue by URL only (no webhooks, no listing, no comments). The GitHub call runs inside the request and is not cached.
+- GitHub fetch handles one issue by URL only (no webhooks, no listing, no comments). The GitHub call runs in the server's threadpool (endpoints are plain `def`) and is not cached. Owner/repo must be ASCII, `.`/`..` are refused.
 - JSON download on the result page is a `data:` link, so nothing is kept on the server.

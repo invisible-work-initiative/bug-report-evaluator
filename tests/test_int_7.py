@@ -28,7 +28,10 @@ def test_finding_for_another_report_is_rejected():
         assemble.collect("mine", IEResult(report_id="mine", findings=[stray]), CIResult(report_id="mine"))
 
 
-def test_request_for_another_report_is_rejected():
-    req = InvestigationRequest(claim_id="c", report_id="other", claim_text="x")
+def test_request_for_another_report_is_rejected(good):
+    class Ev:
+        def evaluate(self, raw, structured):
+            req = InvestigationRequest(claim_id="c", report_id="other", claim_text="x")
+            return IEResult(report_id=raw.report_id, decision="investigate", investigation_requests=[req])
     with pytest.raises(ValueError):
-        assemble.collect("mine", IEResult(report_id="mine", investigation_requests=[req]), CIResult(report_id="mine"))
+        pipeline.run(good, "paste", evaluator=Ev())

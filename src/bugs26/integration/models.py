@@ -52,6 +52,8 @@ class Evidence(BaseModel):
     excerpt: Optional[str] = None
     start: Optional[int] = None  # span in original_body, for report_excerpt
     end: Optional[int] = None
+    line_start: Optional[int] = None  # 1-based lines of that span
+    line_end: Optional[int] = None
 
 
 class Finding(BaseModel):
@@ -104,7 +106,6 @@ class MaintainerOutput(BaseModel):
     ie_decision: Decision
     ie_reason: str
     missing_information: list[str]
-    summary: dict[str, int]
     findings: list[Finding]
     could_not_check: list[str]
     original_title: Optional[str] = None

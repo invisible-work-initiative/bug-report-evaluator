@@ -1,6 +1,7 @@
 """INT-4: send investigation requests, with report context, to Claim Investigation."""
 from typing import Protocol
 
+from .intake import meaningful_text
 from .models import CIResult, IEResult, InvestigationRequest, RawReport, StructuredReport
 
 
@@ -25,7 +26,7 @@ def to_investigation(raw: RawReport, structured: StructuredReport,
         "repo_url": raw.repo_url,
         "issue_url": raw.issue_url,
         "versions": [v.text for v in structured.versions],
-        "environment": [s.text for s in structured.fields.get("environment", [])],
+        "environment": [meaningful_text(s) for s in structured.fields.get("environment", []) if meaningful_text(s)],
         "code_references": [r.text for r in structured.code_references],
     }
     result = CIResult(report_id=raw.report_id)

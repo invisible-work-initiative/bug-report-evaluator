@@ -8,7 +8,6 @@ from bugs26.web.app import app
 def test_output_includes_collected_findings_and_r4(good):
     out = pipeline.run(good, "paste")
     assert len(out.findings) > 0
-    assert sum(out.summary.values()) == len(out.findings)
     assert out.could_not_check  # R4: always present
     assert out.original_body == good and out.structured.report_id == out.report_id
     assert "Claim Investigation is a placeholder: no code was examined" in out.could_not_check

@@ -33,15 +33,18 @@ def receive(body: str, source: str, repo_url: Optional[str] = None,
 
 FIELDS = ["description", "steps_to_reproduce", "expected_behavior", "observed_behavior", "environment"]
 _ALIASES = {
-    "description": ["describe the bug", "bug description", "description", "summary", "what happened"],
+    "description": ["describe the bug", "bug description", "issue description", "description", "summary"],
     "steps_to_reproduce": ["steps to reproduce", "to reproduce", "reproduction steps", "repro steps",
-                           "how to reproduce", "steps"],
+                           "how to reproduce", "how can we reproduce", "how do we reproduce",
+                           "reproducible example", "steps"],
     "expected_behavior": ["expected behavior", "expected behaviour", "expected result", "expected results",
-                          "expected"],
+                          "what did you expect", "expected"],
     "observed_behavior": ["actual behavior", "actual behaviour", "actual result", "actual results",
                           "observed behavior", "observed behaviour", "actual", "observed",
-                          "what happened instead"],
-    "environment": ["environment", "desktop", "smartphone", "system info", "system information", "version", "versions", "platform"],
+                          "what happened instead", "what happened"],
+    "environment": ["environment", "desktop", "smartphone", "system info", "system information",
+                    "installed versions", "os version", "provide environment information",
+                    "version", "versions", "platform"],
 }
 
 
@@ -51,21 +54,34 @@ def _normalize(label: str) -> str:
 
 
 def field_for(label: str) -> Optional[str]:
-    """Exact alias, or alias as a whole-word prefix. Longest alias wins. Never a substring match."""
+    """Exact alias, alias as a whole-word prefix, or (multi-word aliases only) whole-word suffix.
+    Longest alias wins. Never a mid-word substring match."""
     norm = _normalize(label)
     best, best_len = None, 0
     for field, aliases in _ALIASES.items():
         for alias in aliases:
-            if (norm == alias or norm.startswith(alias + " ")) and len(alias) > best_len:
+            hit = norm == alias or norm.startswith(alias + " ") or (" " in alias and norm.endswith(" " + alias))
+            if hit and len(alias) > best_len:
                 best, best_len = field, len(alias)
     return best
 
 
 # --- structure --------------------------------------------------------------------------------
 
-_HEADING = re.compile(r"^ {0,3}#{1,6}[ \t]+(?P<label>.*?)[ \t]*#*[ \t]*$")
-_BOLD = re.compile(r"^ {0,3}\*\*[ \t]*(?P<label>[^*]+?)[ \t]*:?[ \t]*\*\*[ \t]*:?[ \t]*(?P<rest>.*)$")
-_FENCE = re.compile(r"^ {0,3}(```|~~~)")
+_HEADING = re.compile(r"^ {0,3}#{1,6}[ \t]+(?P<label>.*?)(?:[ \t]+#+)?[ \t]*$")
+_BOLD = re.compile(r"^ {0,3}\*\*[ \t]*(?P<label>[^*]+?)[ \t]*(?P<c1>:?)[ \t]*\*\*[ \t]*(?P<c2>:?)[ \t]*(?P<rest>.*)$")
+_FENCE = re.compile(r"^ {0,3}(?P<fence>`{3,}|~{3,})(?P<info>.*)$")
+_COMMENT = re.compile(r"<!--.*?(?:-->|\Z)", re.S)
+
+
+def meaningful_text(section) -> str:
+    """Section text without HTML comments and edge whitespace. Empty = nothing was written."""
+    return _COMMENT.sub("", section.text).strip()
+
+
+def line_of(body: str, offset: int) -> int:
+    """1-based line number of a character offset (same line splitting as str.splitlines)."""
+    return len((body[:offset] + "x").splitlines())
 
 
 def _trim(body: str, start: int, end: int) -> tuple[int, int]:
@@ -78,23 +94,43 @@ def _trim(body: str, start: int, end: int) -> tuple[int, int]:
 
 
 def _markers(body: str) -> list[dict]:
-    """Find section markers outside fenced code. Each: line_start, value_start, label, field."""
-    markers, pos, fence = [], 0, None
-    for line in body.split("\n"):
-        text = line.rstrip("\r")
+    """Find section markers outside fenced code and HTML comments. Each: line_start, value_start, label, field."""
+    markers, pos, fence, in_comment = [], 0, None, False
+    for line in body.splitlines(keepends=True):
+        text = line.rstrip("\r\n\x0b\x0c\x1c\x1d\x1e\x85  ")
         f = _FENCE.match(text)
-        if f:
-            fence = None if fence == f.group(1) else (fence or f.group(1))
-        elif fence is None:
-            h, b = _HEADING.match(text), _BOLD.match(text)
-            if h:
-                markers.append(dict(line_start=pos, value_start=pos + len(text), label=h.group("label"),
-                                    field=field_for(h.group("label"))))
-            elif b and field_for(b.group("label")):  # bold only counts for known labels
-                markers.append(dict(line_start=pos, value_start=pos + b.start("rest"), label=b.group("label"),
-                                    field=field_for(b.group("label"))))
-        pos += len(line) + 1
+        if in_comment:
+            if "-->" in text:
+                in_comment = text.rfind("<!--") > text.rfind("-->")
+        elif fence:
+            if f and f.group("fence")[0] == fence[0] and len(f.group("fence")) >= len(fence) and not f.group("info").strip():
+                fence = None  # closing fence: same char, at least as long
+        elif f:
+            fence = f.group("fence")
+        else:
+            m = _marker(text, pos)
+            if m:
+                markers.append(m)
+            in_comment = text.rfind("<!--") > text.rfind("-->")
+        pos += len(line)
     return markers
+
+
+def _marker(text: str, pos: int):
+    """Marker dict if this line starts a section, else None."""
+    h, b = _HEADING.match(text), _BOLD.match(text)
+    if h:
+        label, value_start = h.group("label"), pos + len(text)
+        before, colon, _ = label.partition(":")
+        if colon and field_for(before):  # "## Expected: it should save" -> text after the colon is content
+            label, value_start = before.strip(), pos + h.start("label") + len(before) + 1
+        return dict(line_start=pos, value_start=value_start, label=label, field=field_for(label))
+    if b and field_for(b.group("label")):  # bold only counts for known labels
+        if b.group("rest").strip() and not (b.group("c1") or b.group("c2")):
+            return None  # "**Expected** it to open..." is a sentence, not a label
+        return dict(line_start=pos, value_start=pos + b.start("rest"), label=b.group("label"),
+                    field=field_for(b.group("label")))
+    return None
 
 
 _EXT = "py|js|jsx|ts|tsx|java|c|h|cpp|go|rs|rb|php|cs|kt|swift|json|ya?ml|toml|md|html|css"
@@ -124,18 +160,8 @@ def structure(raw: RawReport) -> StructuredReport:
     """INT-2: split the body into sections. Each Section is an exact slice (start/end) of the body."""
     body = raw.original_body
     markers = _markers(body)
-    title = raw.original_title
-
-    # No title given: use the first line if it is a heading that is not a known section.
-    if title is None and markers:
-        first = markers[0]
-        if not body[: first["line_start"]].strip() and first["field"] is None:
-            title = first["label"] or None
-            first["label"] = None  # the title is not a section; the text after it is plain preamble
-
     pieces = []  # (label, field, start, end)
-    first_start = markers[0]["line_start"] if markers else len(body)
-    pieces.append((None, None, 0, first_start))
+    pieces.append((None, None, 0, markers[0]["line_start"] if markers else len(body)))
     for i, m in enumerate(markers):
         end = markers[i + 1]["line_start"] if i + 1 < len(markers) else len(body)
         pieces.append((m["label"], m["field"], m["value_start"], end))
@@ -143,15 +169,18 @@ def structure(raw: RawReport) -> StructuredReport:
     fields: dict[str, list[Section]] = {}
     unmapped: list[Section] = []
     for label, field, start, end in pieces:
+        first = start
         start, end = _trim(body, start, end)
         if start == end:
-            continue
+            if label is None:
+                continue  # nothing before the first marker
+            start = end = first  # keep empty sections: the label is content
         section = Section(label=label or None, text=body[start:end], start=start, end=end)
         (fields.setdefault(field, []) if field else unmapped).append(section)
 
     return StructuredReport(
         report_id=raw.report_id,
-        title=title,
+        title=raw.original_title,
         fields=fields,
         unmapped=unmapped,
         code_references=_find_refs(body, _CODE, ["tick", "path", "call"]),
@@ -172,6 +201,5 @@ def verify_structured(raw: RawReport, structured: StructuredReport) -> None:
     for s in spans:
         if not (0 <= s.start <= s.end <= len(body)) or body[s.start:s.end] != s.text:
             raise PreparationError(f"Structured text at {s.start}-{s.end} does not match the original report.")
-    t = structured.title
-    if t is not None and t != raw.original_title and t not in body:
+    if structured.title != raw.original_title:
         raise PreparationError("Title does not match the original report.")

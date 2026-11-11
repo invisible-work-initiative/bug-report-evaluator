@@ -48,7 +48,7 @@ def test_api_errors_are_json():
 def test_bom_upload_is_decoded():
     data = b"\xef\xbb\xbf# Title here\n## Steps\nx"
     body = client.post("/api/evaluate", files={"file": ("a.md", data, "text/markdown")}).json()
-    assert body["original_body"].startswith("# Title here") and body["structured"]["title"] == "Title here"
+    assert body["original_body"].startswith("# Title here") and body["structured"]["title"] is None
     assert body["source"] == "upload"
 
 

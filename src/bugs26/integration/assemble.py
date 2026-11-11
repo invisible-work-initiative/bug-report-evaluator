@@ -1,16 +1,10 @@
 """INT-5/6/7/8: collect findings and build the maintainer output."""
-from collections import Counter
-
-from .intake import FIELDS
 from .models import CIResult, Finding, IEResult, MaintainerOutput, RawReport, StructuredReport
 
 
 def collect(report_id: str, ie: IEResult, ci: CIResult) -> list[Finding]:
-    """INT-5 + INT-7: gather findings from both subsystems; findings and requests must belong to this report.
+    """INT-5 + INT-7: gather findings from both subsystems; findings must belong to this report.
     Findings (and their Evidence) are passed through unchanged (INT-8)."""
-    for r in ie.investigation_requests:
-        if r.report_id != report_id:
-            raise ValueError(f"request {r.claim_id} belongs to report {r.report_id}, not {report_id}")
     findings = list(ie.findings) + list(ci.findings)
     for f in findings:
         if f.report_id != report_id:
@@ -20,9 +14,7 @@ def collect(report_id: str, ie: IEResult, ci: CIResult) -> list[Finding]:
 
 def parse_gaps(structured: StructuredReport) -> list[str]:
     """What Integration itself could not map (R4)."""
-    gaps = [f"Section '{s.label}' not mapped to a known field" for s in structured.unmapped if s.label]
-    gaps += [f"No {name.replace('_', ' ')} section found" for name in FIELDS if name not in structured.fields]
-    return gaps
+    return [f"Section '{s.label}' not mapped to a known field" for s in structured.unmapped if s.label]
 
 
 def build_output(raw: RawReport, structured: StructuredReport, ie: IEResult, ci: CIResult,
@@ -39,7 +31,6 @@ def build_output(raw: RawReport, structured: StructuredReport, ie: IEResult, ci:
         ie_decision=ie.decision,
         ie_reason=ie.reason,
         missing_information=ie.missing_information,
-        summary=dict(Counter(f.status for f in findings)),
         findings=findings,
         could_not_check=could_not_check,
         original_title=raw.original_title,

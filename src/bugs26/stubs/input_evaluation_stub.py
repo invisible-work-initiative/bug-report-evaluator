@@ -3,6 +3,7 @@
 It only checks whether each section exists (P = present, N = not found, U = unable to judge).
 It does not judge quality.
 """
+from ..integration.intake import line_of, meaningful_text
 from ..integration.models import Evidence, Finding, IEResult, InvestigationRequest, RawReport, StructuredReport
 
 PLACEHOLDER = "[PLACEHOLDER Input Evaluation] "
@@ -20,12 +21,14 @@ class StubInputEvaluator:
     def evaluate(self, raw: RawReport, structured: StructuredReport) -> IEResult:
         rid, findings, present = raw.report_id, [], set()
         for cid, field, name in CRITERIA:
-            sections = structured.fields.get(field, [])
+            sections = [s for s in structured.fields.get(field, []) if meaningful_text(s)]
             if sections:
                 present.add(cid)
                 status, text = "present", f"A {name} section is present."
                 evidence = [Evidence(kind="report_excerpt", ref=f"report:{rid}", excerpt=s.text,
-                                     start=s.start, end=s.end) for s in sections]
+                                     start=s.start, end=s.end,
+                                     line_start=line_of(raw.original_body, s.start),
+                                     line_end=line_of(raw.original_body, max(s.start, s.end - 1))) for s in sections]
             else:
                 status, text = "not_found", f"No {name} section was found."
                 evidence = [Evidence(kind="note", ref=f"report:{rid}", excerpt="no matching section")]
