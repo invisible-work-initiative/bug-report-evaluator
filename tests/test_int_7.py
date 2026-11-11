@@ -19,6 +19,9 @@ def test_everything_links_to_its_report():
             for e in f.evidence:
                 assert e.ref == f"report:{out.report_id}"
         assert out.structured.report_id == out.report_id
+        for f in (f for f in out.findings if f.source == "claim_investigation"):  # claims link to their lines (R3)
+            e = f.evidence[0]
+            assert e.kind == "report_excerpt" and out.original_body[e.start:e.end] == e.excerpt == f.subject
 
 
 def test_finding_for_another_report_is_rejected():

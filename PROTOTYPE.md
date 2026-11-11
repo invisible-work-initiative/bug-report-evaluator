@@ -1,4 +1,4 @@
-# Integration Subsystem Prototype (iteration 4)
+# Integration Subsystem Prototype (iteration 5)
 
 A small, in-memory prototype of the **Integration** subsystem of the bug report evaluator. It takes a bug report (pasted, uploaded as `.md`/`.txt`, or fetched from a public GitHub issue URL), preserves and structures it, runs Input Evaluation, routes to Claim Investigation when appropriate, and returns the combined findings to the maintainer as an HTML page or JSON.
 
@@ -8,14 +8,20 @@ No database, no LLM. The only network call is the optional GitHub issue fetch (s
 
 ## Run
 
+Needs Python 3.10 or newer. From the repository root:
+
 ```
-pip install -e .[dev]
-python -m bugs26.web          # http://127.0.0.1:8000/  (access log is off, INT-9)
-pytest
+python -m venv .venv
+.venv\Scripts\Activate.ps1          # Windows PowerShell
+source .venv/bin/activate           # macOS / Linux
+python -m pip install -e ".[dev]"
+python -m pytest
+python -m bugs26.web                # http://127.0.0.1:8000/  (access log is off, INT-9)
 ```
 
-Paste a report, upload one from `samples/`, or give a GitHub issue URL (exactly one source). JSON is also available:
+Paste a report, upload one from `samples/`, or give a GitHub issue URL (exactly one source). `samples/issue-form-report.md` is a synthetic issue-form style report that works offline and shows the "investigate" path with Claim Investigation rows. JSON is also available (on Windows use `curl.exe`, plain `curl` is a PowerShell alias):
 `curl -F "file=@samples/good-report.md" http://127.0.0.1:8000/api/evaluate`.
+The optional repository URL for pasted or uploaded reports must be `https://github.com/OWNER/REPO` and listed in `supported_repos.txt`.
 Set `GITHUB_TOKEN` to raise GitHub's rate limit (optional).
 
 ## Pipeline
@@ -34,13 +40,13 @@ paste / .md,.txt upload / GitHub issue URL                 web/app.py (+ integra
 
 **Routing rule (BRE-DR.11):** Claim Investigation is called only if IE's decision is `investigate` AND IE sent at least one request. If the decision is `request_more_information` or `do_not_investigate`, CI is skipped and "Claims not investigated: <reason>" is shown under Could not check. If the decision is `investigate` but there are no requests, "No specific bug claim was identified" is shown.
 
-**Structuring (`intake.structure`):** a section starts at a markdown heading or at a bold label line (`**Expected:** text`). Markers inside ``` / ~~~ fences (closing fence: same character, at least as long) and inside `<!-- ... -->` comments are ignored. A bold label followed by text counts only if it has a colon (`**Expected:** x` yes, `**Expected** it to open...` no); bold counts only for known labels. `## Expected: it should save` keeps the text after the colon as the section text. Labels match known aliases exactly, as a whole-word prefix, or (multi-word aliases, plus `version`/`versions` for environment) as a whole-word suffix, never as a mid-word substring. GitHub issue-form headings are covered (`What happened?` is observed, `What did you expect to happen?`, `How can we reproduce it`, `Reproducible Example`, `Installed Versions`, ...). Sections with no body are kept (label kept, empty span); a section holding only HTML comments counts as not written (`meaningful_text`). A report with no markers at all (freeform text) is mapped entirely to `description`; if there are headings but none is recognised, could-not-check says so. `_No response_` (GitHub forms) counts as empty. Repeated sections are all kept; unknown headings and preamble go to `unmapped`. Lines split like `str.splitlines` (lone CR works). Edges are trimmed by moving the span, never by changing text. The title is only the GitHub issue title (`original_title`); pasted or uploaded reports have none.
+**Structuring (`intake.structure`):** a section starts at a markdown heading or at a bold label line (`**Expected:** text`). Markers inside ``` / ~~~ fences (closing fence: same character, at least as long) and inside `<!-- ... -->` comments are ignored. A bold label followed by text counts only if it has a colon (`**Expected:** x` yes, `**Expected** it to open...` no); bold counts only for known labels. `## Expected: it should save` keeps the text after the colon as the section text. Labels match known aliases exactly, as a whole-word prefix, or (multi-word aliases, plus `version`/`versions` for environment) as a whole-word suffix, never as a mid-word substring. GitHub issue-form headings are covered (`What happened?` is observed, `What did you expect to happen?`, `How can we reproduce it`, `Reproducible Example`, `Installed Versions`, ...). Sections with no body are kept (label kept, empty span); a section holding only HTML comments counts as not written (`meaningful_text`). A report with no markers at all (freeform text) is mapped entirely to `description` (the section's label stays null; the field mapping does the work, spans untouched); if there are headings but none is recognised, could-not-check says so. `_No response_` (GitHub forms) counts as empty. Repeated sections are all kept; unknown headings and preamble go to `unmapped`. Lines split like `str.splitlines` (lone CR works). Edges are trimmed by moving the span, never by changing text. The title is only the GitHub issue title (`original_title`); pasted or uploaded reports have none.
 
 **Evidence (R3):** a report excerpt carries its char span (`start`/`end`); the result page computes the line numbers from it and links them to the line in the original report view. Integration does not extract code references or versions: finding claims is Input Evaluation's job (the placeholder IE does it with a regex).
 
 **Supported repositories (INT-1):** GitHub issues are accepted only from the repositories in `src/bugs26/integration/supported_repos.txt` (one `owner/repo` per line, `#` comments, case-insensitive). Add a line and restart to support another.
 
-**Failures:** if Claim Investigation raises, the failure goes to could-not-check ("Claim Investigation failed: ...") and the run continues. If Input Evaluation raises, the maintainer gets an error page, never a fake result.
+**Failures:** if Claim Investigation raises, the failure goes to could-not-check ("Claim Investigation failed: ...") and the run continues. If Input Evaluation raises, the maintainer gets an error page (HTTP 502), never a fake result.
 
 ## Plugging in your subsystem
 
@@ -50,7 +56,26 @@ paste / .md,.txt upload / GitHub issue URL                 web/app.py (+ integra
 4. Make it the default by changing the two defaults in `integration/pipeline.py`.
 5. Run `pytest`. The interface agreements in `documentation/interfaces/` list the tests to re-run against your code.
 
-**Could not check (R4):** IE limits + CI limits + `Section '<label>' not mapped to a known field`. Missing sections are reported by the IE findings, not repeated here.
+**Could not check (R4):** IE limits + CI limits + one line `Sections not mapped: a, b, c` (the GitHub issue-form boilerplate headings are listed on purpose; INT-2 honesty). Missing sections are reported by the IE findings, not repeated here.
+
+**Finding subject:** human-readable: the criterion name for IE findings, the claim text for CI findings. A CI finding cites a `report_excerpt` at the claim's span, so it links to its line.
+
+## Glossary of design IDs
+
+The IDs below come from the team's SYSEN 5100 design compendium (HW7), which is not in this repository.
+
+| ID | Meaning |
+|---|---|
+| IF02 | Integration to IE: the prepared report (fields in a consistent structure, original text, source links). |
+| IF03 | Integration to IE: preparation issues (missing fields, problems). No guessed content. |
+| IF04 | IE to Integration: quality assessment, sufficiency, missing information, limits. |
+| IF05 | IE to Integration: checkable claims, each with its location in the original report. |
+| IF06 | Integration to CI: report, claims, evaluation context, source links. Only when there is enough information. |
+| IF07 | CI to Integration: a finding per claim, with evidence and source links. |
+| IF08 | CI to Integration: limits or failures, with reasons. Findings for other claims are kept. |
+| IF11 | Design input from IE: required report fields and sufficiency rules. |
+| IF12 | Design input from CI: claim and evidence fields. |
+| BRE-DR.11 | Routing rule: send to CI only when the report is sufficient AND there is at least one claim. |
 
 ## Traceability
 

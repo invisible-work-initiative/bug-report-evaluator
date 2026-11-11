@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "bugs26"
 version = "0.1.0"
-description = "Bug report evaluator - Integration subsystem prototype (iteration 1)"
+description = "Bug report evaluator - Integration subsystem prototype"
 requires-python = ">=3.10"
 dependencies = [
     "fastapi",

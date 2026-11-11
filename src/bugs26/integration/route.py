@@ -24,6 +24,8 @@ def to_investigation(raw: RawReport, structured: StructuredReport,
         request = request.model_copy(update={"context": context})  # ie_context stays as IE sent it
         try:
             answer = investigator.investigate(request)
+            if answer.report_id != request.report_id:
+                raise ValueError("its answer belongs to another report")
         except Exception as e:  # CI failing must not hide IE's findings (R4): report it and go on
             result.not_checked.append(f"Claim Investigation failed: {type(e).__name__}: {str(e)[:200]}")
             continue

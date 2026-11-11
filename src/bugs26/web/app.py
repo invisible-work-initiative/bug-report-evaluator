@@ -8,13 +8,10 @@ from fastapi.templating import Jinja2Templates
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from ..integration import github, pipeline
+from ..integration.intake import InputEvaluationError
 
 MAX_BYTES = 200 * 1024        # one report
 MAX_REQUEST = 256 * 1024      # whole request (Content-Length)
-DECISIONS = {"investigate": "Worth investigating", "request_more_information": "Ask the reporter for more information",
-             "do_not_investigate": "Not investigated"}
-STATUSES = {"present": "Present", "not_found": "Not found", "unable_to_judge": "Could not judge",
-            "verified": "Verified", "refuted": "Refuted", "could_not_check": "Could not check"}
 
 app = FastAPI(title="Bug report evaluator (Integration prototype)")
 templates = Jinja2Templates(directory=str(Path(__file__).parent / "templates"))
@@ -29,11 +26,11 @@ def span_lines(body: str, start: int, end: int) -> tuple[int, int]:
 def short(text: Optional[str]) -> str:
     """Evidence excerpt for the table: at most 3 lines and about 200 characters."""
     text = text or ""
-    cut = "\n".join(text.splitlines()[:3])[:200]
+    cut = "".join(text.splitlines(True)[:3])[:200]
     return cut + ("..." if cut != text else "")
 
 
-templates.env.globals.update(span_lines=span_lines, DECISIONS=DECISIONS, STATUSES=STATUSES)
+templates.env.globals.update(span_lines=span_lines)
 templates.env.filters["short"] = short
 
 
@@ -65,6 +62,8 @@ def _evaluate(text: str, file: Optional[UploadFile], issue_url: str, repo_url: s
         raise HTTPException(400, "Provide exactly one of: pasted text, an uploaded file, or a GitHub issue URL.")
     title, issue, source = None, None, "paste"
     try:
+        if repo_url.strip() and not issue_url.strip():
+            github.parse(repo_url, issue=False)
         if issue_url.strip():
             found = github.fetch_issue(issue_url)
             text, title, issue, repo_url, source = found["body"], found["title"], found["issue_url"], found["repo_url"], "github"
@@ -73,6 +72,8 @@ def _evaluate(text: str, file: Optional[UploadFile], issue_url: str, repo_url: s
         if max(len(text.encode("utf-8")), len(upload)) > MAX_BYTES:
             raise HTTPException(413, "Report is larger than 200 KB.")
         return pipeline.run(text, source, repo_url.strip() or None, title=title, issue_url=issue)
+    except InputEvaluationError as e:
+        raise HTTPException(502, str(e)[:500])
     except ValueError as e:  # GitHubError, PreparationError, bad UTF-8, pydantic errors, id mismatches
         raise HTTPException(400, str(e)[:500])
 

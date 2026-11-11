@@ -30,6 +30,7 @@ Out of scope: how CI checks a claim, and which public sources it uses.
 - [Interface management](../interface-agreements.md)
 - [Input Evaluation - Integration agreement](input-evaluation-integration.md)
 - Team design notes: IF06, IF07, IF08 and routing rule BRE-DR.11
+- Design IDs (IF02, IF05, BRE-DR.11 ...) come from the team's SYSEN 5100 design compendium (HW7). Short definitions are in the glossary in [PROTOTYPE.md](../../PROTOTYPE.md).
 - Code: `src/bugs26/integration/models.py`, `src/bugs26/integration/interfaces.py`, `src/bugs26/integration/route.py`, `src/bugs26/stubs/claim_investigation_stub.py`
 
 ## 3 Interface description
@@ -81,7 +82,7 @@ If the decision is `request_more_information` or `do_not_investigate`, Integrati
 
 | Key | Type | Meaning |
 |---|---|---|
-| `repo_url` | string or null | Repository URL, GitHub source only. |
+| `repo_url` | string or null | `https://github.com/OWNER/REPO`, in `supported_repos.txt`. Set for GitHub reports; a pasted or uploaded report has one only if the maintainer entered it. |
 | `issue_url` | string or null | Issue URL, GitHub source only. |
 | `fields` | object | Text of each structured section that has content, by field name: `description`, `steps_to_reproduce`, `expected_behavior`, `observed_behavior`, `environment`. Each value is a list of strings. Empty sections and `_No response_` are left out. |
 
@@ -115,7 +116,7 @@ The context has no reporter identity (INT-9).
 | `finding_id` | string | Unique id of the finding. |
 | `report_id` | string | The report it belongs to. Must match (INT-7). |
 | `source` | `claim_investigation` | CI uses this value. |
-| `subject` | string | The `claim_id` the finding is about. |
+| `subject` | string | Human-readable: the claim text the finding is about (the request's `claim_text`). |
 | `status` | `verified`, `refuted` or `could_not_check` | The result of checking the claim. |
 | `statement` | string | The finding in words. |
 | `evidence` | list of `Evidence` | What supports it (R3). |
@@ -144,7 +145,7 @@ The context has no reporter identity (INT-9).
 **Claim Investigation (proposed):**
 
 - Return one `CIResult` per request.
-- Set `report_id` on every finding, and `subject` to the `claim_id`.
+- Set `report_id` on every finding, and `subject` to the claim text. Cite a `report_excerpt` with the claim's `start` and `end` when the evidence is the claim itself, so it links to its line in the report.
 - Cite evidence for every finding.
 - State what it could not check in `not_checked`, and keep findings for other claims when one claim fails.
 - Add no reporter identity to any item.
@@ -173,13 +174,13 @@ If `investigate` raises, Integration adds "Claim Investigation failed: <Exceptio
 | IF-CI-1 | Test | Run with each decision, with and without requests. Check when CI is called. | `tests/test_int_4.py::test_uc2_ci_skipped_unless_investigate`, `test_uc3_ci_skipped_without_requests` | Pass |
 | IF-CI-2 | Test | Run with a recording investigator. Check the context. | `tests/test_int_4.py::test_ci_receives_request_with_context` | Pass (stub) |
 | IF-CI-3 | Test | Send a request for another report. Check it is refused. | `tests/test_int_4.py::test_report_id_mismatch_is_rejected` | Pass |
-| IF-CI-4 | Test | Return a finding for another report. Check it is refused. | `tests/test_int_7.py::test_finding_for_another_report_is_rejected` | Pass (stub) |
+| IF-CI-4 | Test | Return a finding for another report, and a `CIResult` for another report. Check both are refused. | `tests/test_int_7.py::test_finding_for_another_report_is_rejected`, `tests/test_int_4.py::test_ci_answer_for_another_report_is_a_failure_not_a_finding` | Pass |
 | IF-CI-5 | Test | Check every CI finding has evidence. | Not written. Needs real CI code. | Open |
 | IF-CI-6 | Test | Check CI limits reach the maintainer output. | `tests/test_int_6.py::test_output_includes_collected_findings_and_r4` | Pass (stub) |
 | IF-CI-7 | Test | Check evidence equals what CI sent. | `tests/test_int_8.py::test_evidence_unchanged_from_both_subsystems` | Pass |
 | IF-CI-8 | Test | Check the skip reason is in `could_not_check`. | `tests/test_int_4.py::test_uc2_ci_skipped_unless_investigate` | Pass |
-| IF-CI-10 | Test | Make the investigator raise. Check the failure is in `could_not_check` and the run continues. | `tests/test_int_4.py::test_ci_failure_is_reported_and_the_run_continues` | Pass |
 | IF-CI-9 | Inspection | Use the INT-9 checklist on both sides. | [verification.md](../subsystems/integration/verification.md) | Open |
+| IF-CI-10 | Test | Make the investigator raise. Check the failure is in `could_not_check` and the run continues. | `tests/test_int_4.py::test_ci_failure_is_reported_and_the_run_continues` | Pass |
 
 ## 8 Open items
 
@@ -188,7 +189,7 @@ Each item: owner TBD, target before Gate 2 (2026-12-07).
 1. Claim extraction is IE's job (Integration no longer extracts code references or versions). CI should confirm what it needs in a request (IF12), including whether `fields` is enough context.
 2. Claim granularity. What counts as one claim, so that CI returns one finding per claim?
 3. Decision vocabulary. The routing rule depends on IE's `investigate` value. CI and IE should agree on the values.
-4. Repository access. Does CI need to read or clone the repository? If so, who clones it, and from which `repo_url` and version? The prototype gives CI only the URL and versions.
+4. Repository access. Does CI need to read or clone the repository? If so, who clones it, and from which `repo_url` and version? The prototype gives CI `repo_url`, `issue_url` and the structured `fields` (see section 4.1).
 5. Timeouts. How long may one `investigate` call take? A raised exception is handled: Integration keeps findings from other claims and adds the failure to `could_not_check`. A call that does not return is not handled.
 6. Python package or HTTP service. Integration proposes an in-process Python package that implements the `ClaimInvestigator` Protocol. If CI needs a service, the format and error handling must be defined.
 7. Is one call per claim right, or should CI get all claims for a report in one call?

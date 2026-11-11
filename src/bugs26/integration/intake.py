@@ -12,6 +12,10 @@ class PreparationError(ValueError):
     """The report could not be prepared faithfully; the run must stop (no fake result)."""
 
 
+class InputEvaluationError(Exception):
+    """Input Evaluation raised. The run stops: without IE there is no honest result."""
+
+
 def receive(body: str, source: str, repo_url: Optional[str] = None,
             title: Optional[str] = None, issue_url: Optional[str] = None) -> RawReport:
     """INT-1: accept a report and keep the original title/body verbatim (nothing normalised)."""
@@ -133,9 +137,8 @@ def structure(raw: RawReport) -> StructuredReport:
     """INT-2: split the body into sections. Each Section is an exact slice (start/end) of the body."""
     body = raw.original_body
     markers = _markers(body)
-    # No markers at all: a freeform report. The whole text is the description.
-    pieces = [("description" if not markers else None, "description" if not markers else None, 0,
-               markers[0]["line_start"] if markers else len(body))]
+    # No markers at all: a freeform report. The whole text is the description (its label stays None).
+    pieces = [(None, None if markers else "description", 0, markers[0]["line_start"] if markers else len(body))]
     for i, m in enumerate(markers):
         end = markers[i + 1]["line_start"] if i + 1 < len(markers) else len(body)
         pieces.append((m["label"], m["field"], m["value_start"], end))

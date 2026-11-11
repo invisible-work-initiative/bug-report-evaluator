@@ -11,6 +11,7 @@ def test_output_includes_collected_findings_and_r4(good):
     assert out.could_not_check  # R4: always present
     assert out.original_body == good and out.structured.report_id == out.report_id
     assert "Claim Investigation is a placeholder: no code was examined" in out.could_not_check
+    assert "C6/C7 not judged (placeholder)" in out.could_not_check  # IE limits reach the maintainer (R4)
 
 
 def test_output_reaches_maintainer_interface(good):

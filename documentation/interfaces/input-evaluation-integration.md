@@ -30,6 +30,7 @@ Out of scope: how IE judges quality, and how IE finds claims.
 - [Interface management](../interface-agreements.md)
 - [Claim Investigation - Integration agreement](claim-investigation-integration.md)
 - Team design notes: IF02, IF03 (to IE) and IF04, IF05 (from IE)
+- Design IDs (IF02, IF05, BRE-DR.11 ...) come from the team's SYSEN 5100 design compendium (HW7). Short definitions are in the glossary in [PROTOTYPE.md](../../PROTOTYPE.md).
 - Code: `src/bugs26/integration/models.py`, `src/bugs26/integration/interfaces.py`, `src/bugs26/integration/pipeline.py`, `src/bugs26/stubs/input_evaluation_stub.py`
 
 ## 3 Interface description
@@ -70,7 +71,7 @@ sequenceDiagram
 | `sha256` | string | Hash of title (or empty string), a newline, and body. |
 | `received_at` | datetime | When Integration received it (UTC). |
 | `source` | `paste`, `upload` or `github` | How the report arrived. GitHub reports are accepted only from repositories listed in `src/bugs26/integration/supported_repos.txt`. |
-| `repo_url` | string or null | Repository URL, GitHub source only. |
+| `repo_url` | string or null | Repository URL, `https://github.com/OWNER/REPO`, and the repository must be in `supported_repos.txt`. Set for GitHub reports. A pasted or uploaded report has one only if the maintainer entered it; it is validated the same way. |
 | `issue_url` | string or null | Issue URL, GitHub source only. |
 
 There is no field for the reporter (INT-9).
@@ -125,7 +126,7 @@ A report with no headings at all (freeform text) has its whole text in `descript
 | `finding_id` | string | Unique id of the finding. |
 | `report_id` | string | The report it belongs to. Must match (INT-7). |
 | `source` | `input_evaluation` or `claim_investigation` | Who produced it. IE uses `input_evaluation`. |
-| `subject` | string | The quality criterion for IE findings. |
+| `subject` | string | Human-readable. For IE findings, the quality criterion name, such as `steps to reproduce`. |
 | `status` | `present`, `not_found` or `unable_to_judge` for IE | The result. The model also allows `verified`, `refuted` and `could_not_check`, which are for Claim Investigation. |
 | `statement` | string | The finding in words. |
 | `evidence` | list of `Evidence` | What supports it (R3). |
@@ -168,7 +169,7 @@ A report with no headings at all (freeform text) has its whole text in `descript
 - State what it could not check in `not_checked`.
 - Add no reporter identity to any item.
 
-If `evaluate` raises, Integration stops and shows "Input Evaluation failed" with the error type. It does not show a partial result.
+If `evaluate` raises, Integration stops and shows "Input Evaluation failed" with the error type (HTTP 502). It does not show a partial result.
 
 ## 6 Interface requirements
 
@@ -192,8 +193,8 @@ If `evaluate` raises, Integration stops and shows "Input Evaluation failed" with
 | IF-IE-3 | Test | Run with the real IE and check the result type and id. | Not written. Needs real IE code. | Open |
 | IF-IE-4 | Test | Return a finding or request for another report. Check it is refused. | `tests/test_int_7.py::test_finding_for_another_report_is_rejected`, `test_request_for_another_report_is_rejected` | Pass (stub) |
 | IF-IE-5 | Test | Check every IE finding has evidence. | Not written. | Open |
-| IF-IE-6 | Test | Check `not_checked` reaches the maintainer output. | `tests/test_int_6.py::test_output_includes_collected_findings_and_r4` | Pass (stub) |
-| IF-IE-7 | Test | Check evidence equals what IE sent. | `tests/test_int_8.py::test_evidence_unchanged_from_both_subsystems` | Pass |
+| IF-IE-6 | Test | Check `not_checked` reaches the maintainer output, including the C6/C7 limit. | `tests/test_int_6.py::test_output_includes_collected_findings_and_r4` | Pass (stub) |
+| IF-IE-7 | Test | Check evidence equals what IE sent, and `ie_context` reaches CI untouched. | `tests/test_int_8.py::test_evidence_unchanged_from_both_subsystems`, `tests/test_int_4.py::test_ci_receives_request_with_context` | Pass |
 | IF-IE-8 | Inspection | Use the INT-9 checklist on both sides. | [verification.md](../subsystems/integration/verification.md) | Open |
 
 ## 8 Open items

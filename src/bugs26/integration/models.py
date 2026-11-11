@@ -50,7 +50,7 @@ class Finding(BaseModel):
     finding_id: str
     report_id: str
     source: Literal["input_evaluation", "claim_investigation"]
-    subject: str  # criterion (IE) or claim_id (CI)
+    subject: str  # human-readable: criterion name (IE) or claim text (CI)
     # IE criteria: present / not_found / unable_to_judge.  CI claims: verified / refuted / could_not_check.
     status: Literal["present", "not_found", "unable_to_judge", "verified", "refuted", "could_not_check"]
     statement: str

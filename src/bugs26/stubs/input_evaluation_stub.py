@@ -46,13 +46,13 @@ class StubInputEvaluator:
 
         def add(cid, name, status, text, evidence):
             findings.append(Finding(finding_id=f"{rid}-{cid}", report_id=rid, source="input_evaluation",
-                                    subject=f"{cid} {name}", status=status, statement=PLACEHOLDER + text,
+                                    subject=name, status=status, statement=PLACEHOLDER + text,
                                     evidence=evidence))
         for cid, field, name in CRITERIA:
             sections = [s for s in structured.fields.get(field, []) if meaningful_text(s)]
             if sections:
                 present.add(cid)
-                add(cid, name, "present", f"A {name} section is present.",
+                add(cid, name, "present", f"{'An' if name[0] in 'aeiou' else 'A'} {name} section is present.",
                     [Evidence(kind="report_excerpt", ref=f"report:{rid}", excerpt=s.text, start=s.start, end=s.end)
                      for s in sections])
             else:

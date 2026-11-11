@@ -2,13 +2,10 @@
 import json
 import os
 import re
-from pathlib import Path
-import urllib.error
 import urllib.request
+from pathlib import Path
 
-_ISSUE_URL = re.compile(r"^https://github\.com/(?P<owner>[\w.-]+)/(?P<repo>[\w.-]+)/issues/(?P<number>\d+)/?", re.ASCII)
-
-
+_URL = re.compile(r"https://github\.com/(?P<owner>[\w.-]+)/(?P<repo>[\w.-]+)(?:/issues/(?P<number>\d+))?/?", re.ASCII)
 SUPPORTED_FILE = Path(__file__).with_name("supported_repos.txt")
 
 
@@ -24,7 +21,7 @@ def _http_get(url: str) -> dict:
     try:
         with urllib.request.urlopen(urllib.request.Request(url, headers=headers), timeout=10) as resp:
             return json.loads(resp.read().decode("utf-8"))
-    except (urllib.error.URLError, TimeoutError, ValueError) as e:  # HTTPError is a URLError
+    except (OSError, ValueError) as e:  # URLError, HTTPError and timeouts are OSErrors
         raise GitHubError(f"Could not get this issue from GitHub ({getattr(e, 'code', type(e).__name__)}).") from None
 
 
@@ -34,15 +31,22 @@ def supported_repos() -> set[str]:
     return {l for l in lines if l and not l.startswith("#")}
 
 
-def fetch_issue(issue_url: str) -> dict:
-    """Return {"title", "body", "issue_url", "repo_url"} for https://github.com/{o}/{r}/issues/{n}."""
-    m = _ISSUE_URL.fullmatch(issue_url.strip())
-    if not m or {m.group("owner"), m.group("repo")} & {".", ".."}:
-        raise GitHubError("Not a GitHub issue URL. Expected https://github.com/OWNER/REPO/issues/NUMBER.")
-    owner, repo, number = m.group("owner", "repo", "number")
+def parse(url: str, issue: bool):
+    """(owner, repo, number) of a GitHub repo or issue URL; the repo must be in supported_repos.txt."""
+    m = _URL.fullmatch(url.strip())
+    if not m or bool(m.group("number")) != issue or {m.group("owner"), m.group("repo")} & {".", ".."}:
+        raise GitHubError("Not a GitHub issue URL. Expected https://github.com/OWNER/REPO/issues/NUMBER." if issue
+                          else "Repository URL must look like https://github.com/OWNER/REPO.")
+    owner, repo = m.group("owner", "repo")
     if f"{owner}/{repo}".lower() not in supported_repos():
         raise GitHubError(f"{owner}/{repo} is not a supported repository. To add one, put 'owner/repo' on a new "
                           "line in src/bugs26/integration/supported_repos.txt and restart.")
+    return owner, repo, m.group("number")
+
+
+def fetch_issue(issue_url: str) -> dict:
+    """Return {"title", "body", "issue_url", "repo_url"} for https://github.com/{o}/{r}/issues/{n}."""
+    owner, repo, number = parse(issue_url, issue=True)
     data = _http_get(f"https://api.github.com/repos/{owner}/{repo}/issues/{number}")
     if not isinstance(data, dict):
         raise GitHubError("Unexpected answer from GitHub.")

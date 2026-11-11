@@ -10,13 +10,16 @@ pre{white-space:pre-wrap;margin:.2rem 0;background:#f4f4f4;padding:.3rem}
 .orig td{border:0;padding:0 .5rem;font:13px monospace;white-space:pre-wrap}.orig td:first-child{color:#888;text-align:right}
 .span{color:#666;font-size:.85em}</style></head>
 <body>
+{% set DECISIONS = {"investigate": "Worth investigating", "request_more_information": "Ask the reporter for more information", "do_not_investigate": "Not investigated"} %}
+{% set STATUSES = {"present": "Present", "not_found": "Not found", "unable_to_judge": "Could not judge", "verified": "Verified", "refuted": "Refuted", "could_not_check": "Could not check"} %}
 <p><a href="/">&larr; Evaluate another report</a></p>
 <h2>{{ output.original_title or "Bug report" }}</h2>
 {% if issue_link %}<p><a href="{{ issue_link }}">{{ issue_link }}</a></p>{% endif %}
-<div class="banner {{ output.ie_decision }}">{{ DECISIONS[output.ie_decision] }}<br><span style="font-weight:normal">{{ output.ie_reason }}</span>
+{% set claims = output.findings | selectattr("source", "equalto", "claim_investigation") | list %}
+<div class="banner {{ output.ie_decision }}">{% if output.ie_decision == "investigate" and claims and not (claims | rejectattr("status", "equalto", "could_not_check") | list) %}Worth investigating &mdash; claims could not be checked yet{% else %}{{ DECISIONS[output.ie_decision] }}{% endif %}<br><span style="font-weight:normal">{{ output.ie_reason }}</span>
 {% if output.missing_information %}<br><span style="font-weight:normal">Missing information: {{ output.missing_information | join(", ") }}</span>{% endif %}</div>
 <h2>Summary</h2>
-<ul>{% for status, items in output.findings | groupby("status") %}<li>{{ STATUSES[status] }}: {{ items | length }}</li>{% endfor %}</ul>
+<ul>{% for status, items in output.findings | groupby("status") %}<li>{{ "Claims not checked" if status == "could_not_check" else STATUSES[status] }}: {{ items | length }}</li>{% endfor %}</ul>
 <h2>Findings</h2>
 {% for key, label in [("input_evaluation", "Input Evaluation"), ("claim_investigation", "Claim Investigation")] %}
 {% set findings = output.findings | selectattr("source", "equalto", key) | list %}
@@ -24,7 +27,7 @@ pre{white-space:pre-wrap;margin:.2rem 0;background:#f4f4f4;padding:.3rem}
 {% if findings %}
 <table><tr><th>Subject</th><th>Status</th><th>Statement</th><th>Evidence</th></tr>
 {% for f in findings %}<tr><td>{{ f.subject }}</td><td class="{{ f.status }}">{{ STATUSES[f.status] }}</td><td>{{ f.statement }}</td>
-<td>{% for e in f.evidence %}<div>{% if e.start is not none %}{% set a, b = span_lines(output.original_body, e.start, e.end) %}<a href="#L{{ a }}">lines {{ a }}&ndash;{{ b }}</a>{% else %}{{ e.kind }}{% endif %}{% if not e.ref.startswith("report:") %} {{ e.ref }}{% endif %}{% if e.excerpt %}<pre>{{ e.excerpt | short }}</pre>{% endif %}</div>{% endfor %}</td></tr>
+<td>{% for e in f.evidence %}<div>{% if e.start is not none %}{% set a, b = span_lines(output.original_body, e.start, e.end) %}<a href="#L{{ a }}">{% if a == b %}line {{ a }}{% else %}lines {{ a }}&ndash;{{ b }}{% endif %}</a>{% else %}{{ e.kind }}{% endif %}{% if not e.ref.startswith("report:") %} {{ e.ref }}{% endif %}{% if e.excerpt %}<pre>{{ e.excerpt | short }}</pre>{% endif %}</div>{% endfor %}</td></tr>
 {% endfor %}</table>
 {% else %}<p>No findings.</p>{% endif %}
 {% endfor %}

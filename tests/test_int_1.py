@@ -67,6 +67,25 @@ def test_received_github_report_has_no_author(monkeypatch):
     assert "user" not in RawReport.model_fields and "author" not in RawReport.model_fields
 
 
+@pytest.mark.parametrize("url, ok", [("https://github.com/o/r", True), ("https://github.com/O/R/", True),
+                                     ("https://github.com/o/r/issues/1", False), ("https://github.com/jqlang/jq", False),
+                                     ("http://github.com/o/r", False), ("https://github.com/../r", False), ("o/r", False)])
+def test_repo_url_parse(url, ok):
+    if ok:
+        assert github.parse(url, issue=False)[:2] in {("o", "r"), ("O", "R")}
+    else:
+        with pytest.raises(github.GitHubError):
+            github.parse(url, issue=False)
+
+
+def test_oserror_from_github_is_a_clean_error(monkeypatch):
+    def boom(*a, **k):
+        raise ConnectionResetError("reset")
+    monkeypatch.setattr(github.urllib.request, "urlopen", boom)
+    with pytest.raises(github.GitHubError, match="Could not get this issue"):
+        github.fetch_issue("https://github.com/o/r/issues/1")
+
+
 def test_non_object_answer_is_rejected(monkeypatch):
     monkeypatch.setattr(github, "_http_get", lambda u: ["not", "a", "dict"])
     with pytest.raises(github.GitHubError):

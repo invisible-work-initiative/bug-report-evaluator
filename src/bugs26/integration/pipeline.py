@@ -13,8 +13,8 @@ def run(text: str, source: str, repo_url: Optional[str] = None,
         evaluator: Optional[InputEvaluator] = None,
         investigator: Optional[ClaimInvestigator] = None) -> MaintainerOutput:
     """receive (INT-1) -> structure + check (INT-2) -> IE (INT-3) -> CI if routed (INT-4)
-    -> collect (INT-5,7,8) -> output (INT-6). Raises PreparationError if the report can't be prepared
-    or Input Evaluation fails; a Claim Investigation failure is reported in could_not_check instead."""
+    -> collect (INT-5,7,8) -> output (INT-6). Raises PreparationError if the report can't be prepared,
+    InputEvaluationError if Input Evaluation fails; a Claim Investigation failure is reported in could_not_check instead."""
     evaluator = evaluator or StubInputEvaluator()
     investigator = investigator or StubClaimInvestigator()
     raw = intake.receive(text, source, repo_url, title, issue_url)
@@ -23,7 +23,7 @@ def run(text: str, source: str, repo_url: Optional[str] = None,
     try:
         ie = evaluator.evaluate(raw, structured)
     except Exception as e:
-        raise intake.PreparationError(f"Input Evaluation failed: {type(e).__name__}: {str(e)[:200]}") from None
+        raise intake.InputEvaluationError(f"Input Evaluation failed: {type(e).__name__}: {str(e)[:200]}") from None
     ci = route.to_investigation(raw, structured, ie, investigator)
     findings = assemble.collect(raw.report_id, ie, ci)
     return assemble.build_output(raw, structured, ie, ci, findings)

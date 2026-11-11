@@ -68,10 +68,17 @@ def test_ci_failure_is_reported_and_the_run_continues(good):
 
 
 def test_ie_failure_stops_with_an_error(good):
-    from bugs26.integration.intake import PreparationError
+    from bugs26.integration.intake import InputEvaluationError
 
     class Boom:
         def evaluate(self, raw, structured):
             raise KeyError("x")
-    with pytest.raises(PreparationError, match="Input Evaluation failed: KeyError"):
+    with pytest.raises(InputEvaluationError, match="Input Evaluation failed: KeyError"):
         pipeline.run(good, "paste", evaluator=Boom())
+def test_ci_answer_for_another_report_is_a_failure_not_a_finding(good):
+    class Wrong:
+        def investigate(self, request):
+            return CIResult(report_id="other", findings=[])
+    out = pipeline.run(good, "paste", evaluator=evaluator(), investigator=Wrong())
+    assert any(c.startswith("Claim Investigation failed: ValueError") and "another report" in c
+               for c in out.could_not_check)

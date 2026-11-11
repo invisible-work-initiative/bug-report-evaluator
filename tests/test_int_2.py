@@ -140,6 +140,12 @@ def test_explicit_title_is_kept_and_nothing_is_derived():
     assert s.title is None
 
 
+def test_freeform_label_stays_none_and_spans_are_untouched():
+    raw, s = structured("  it is broken  " + chr(10))
+    (sec,) = s.fields["description"]
+    assert sec.label is None and sec.text == "it is broken" and raw.original_body[sec.start:sec.end] == sec.text
+
+
 def test_unmapped_sections():
     _, s = structured("Hello there\n## Screenshots\nimg\n## Steps\nx")
     assert [(u.label, u.text) for u in s.unmapped] == [(None, "Hello there"), ("Screenshots", "img")]
