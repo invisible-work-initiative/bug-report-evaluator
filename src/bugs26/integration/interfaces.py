@@ -1,14 +1,15 @@
-"""The two interfaces other subsystems implement (see documentation/interfaces/). Pass them to pipeline.run()."""
+"""The two interfaces other subsystems implement (see documentation/interfaces/). Pass them to pipeline.run().
+Transport: in-process Python call, provisional pending the IE transport decision (target 2026-11-24)."""
 from typing import Protocol
 
-from .models import CIResult, IEResult, InvestigationRequest, RawReport, StructuredReport
+from .models import CIRequest, CIResult, IEReportRecord, IEResult
 
 
 class InputEvaluator(Protocol):
-    """INT-3: gets the original and the structured report, returns decision, findings and requests."""
-    def evaluate(self, raw: RawReport, structured: StructuredReport) -> IEResult: ...
+    """INT-3: gets one report record (original raw_body + sections), returns the IE v1 evaluation result."""
+    def evaluate(self, record: IEReportRecord) -> IEResult: ...
 
 
 class ClaimInvestigator(Protocol):
-    """INT-4: gets one request (with context), returns findings and what it could not check."""
-    def investigate(self, request: InvestigationRequest) -> CIResult: ...
+    """INT-4: gets one claim with its context, returns the result for that claim."""
+    def investigate(self, request: CIRequest) -> CIResult: ...

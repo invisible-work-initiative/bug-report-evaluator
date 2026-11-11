@@ -40,14 +40,16 @@ def test_github_user_never_reaches_a_model(monkeypatch):
                "user": {"login": "SECRETNAME"}, "assignees": [{"login": "SECRETNAME"}]}
     monkeypatch.setattr(github, "_http_get", lambda u: payload)
     got = github.fetch_issue("https://github.com/o/r/issues/1")
-    out = pipeline.run(got["body"], "github", got["repo_url"], title=got["title"], issue_url=got["issue_url"])
+    out = pipeline.run(got["body"], "github", got["repo_url"], title=got["title"], issue_url=got["issue_url"],
+                       issue_number=got["issue_number"], labels=got["labels"], created_at=got["created_at"],
+                       updated_at=got["updated_at"])
     assert "SECRETNAME" not in out.model_dump_json() and "SECRETNAME" not in str(got)
 
 
 def test_two_submissions_share_no_identifier(good):
     a, b = pipeline.run(good, "paste"), pipeline.run(good, "paste")
-    ids_a = {a.report_id, *(f.finding_id for f in a.findings)}
-    ids_b = {b.report_id, *(f.finding_id for f in b.findings)}
+    ids_a = {a.report_id, a.request_id, a.snapshot_id}
+    ids_b = {b.report_id, b.request_id, b.snapshot_id}
     assert not ids_a & ids_b
 
 

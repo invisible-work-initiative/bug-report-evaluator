@@ -3,9 +3,8 @@ import pytest
 from fastapi.testclient import TestClient
 
 from bugs26.integration import github, pipeline
-from bugs26.integration.models import Evidence, Finding, IEResult
 from bugs26.web.app import app
-from conftest import NAMES, sample
+from conftest import NAMES, ie_result, sample
 
 client = TestClient(app)
 
@@ -19,7 +18,7 @@ def test_evaluate_html_result(good):
     r = client.post("/evaluate", data={"text": good, "repo_url": "https://github.com/o/r"})
     assert r.status_code == 200
     for s in ("Input Evaluation", "Claim Investigation", "Could not check", "PLACEHOLDER", "Download JSON",
-              "Worth investigating", "Original report", "lines ", "Technical details"):
+              "Partial evaluation", "Original report", "line ", "Technical details", "C7", "Insufficient evidence"):
         assert s in r.text
 
 
@@ -27,7 +26,7 @@ def test_all_samples_via_both_endpoints():
     for name in NAMES:
         assert client.post("/evaluate", data={"text": sample(name)}).status_code == 200
         body = client.post("/api/evaluate", data={"text": sample(name)}).json()
-        assert body["could_not_check"] and body["ie_decision"]
+        assert body["could_not_check"] and body["ie"]["processing_status"]
 
 
 def test_xss_is_escaped_everywhere():
@@ -50,7 +49,7 @@ def test_api_errors_are_json():
 def test_bom_upload_is_decoded():
     data = b"\xef\xbb\xbf# Title here\n## Steps\nx"
     body = client.post("/api/evaluate", files={"file": ("a.md", data, "text/markdown")}).json()
-    assert body["original_body"].startswith("# Title here") and body["structured"]["title"] is None
+    assert body["raw_body"].startswith("# Title here") and body["structured"]["title"] == ""
     assert body["source"] == "upload"
 
 
@@ -80,7 +79,7 @@ def test_github_issue_source(monkeypatch):
     monkeypatch.setattr(github, "_http_get", lambda u: {"title": "Boom", "body": "## Steps\nx",
                                                         "html_url": "https://github.com/o/r/issues/2"})
     body = client.post("/api/evaluate", data={"issue_url": "https://github.com/o/r/issues/2"}).json()
-    assert body["source"] == "github" and body["original_title"] == "Boom" and body["issue_url"].endswith("/issues/2")
+    assert body["source"] == "github" and body["title"] == "Boom" and body["issue_url"].endswith("/issues/2")
     r = client.post("/evaluate", data={"issue_url": "https://example.com/x"})
     assert r.status_code == 400 and "Not a GitHub issue URL" in r.text
 
@@ -88,13 +87,13 @@ def test_github_issue_source(monkeypatch):
 def test_unsupported_repo_error_page(monkeypatch):
     monkeypatch.setattr(github, "_http_get", lambda u: pytest.fail("no network call expected"))
     r = client.post("/evaluate", data={"issue_url": "https://github.com/jqlang/jq/issues/3597"})
-    assert r.status_code == 400 and "not a supported repository" in r.text and "supported_repos.txt" in r.text
+    assert r.status_code == 400 and "This repository is not supported yet" in r.text and "supported_repos.txt" not in r.text
 
 
-def test_freeform_paste_maps_to_description():
+def test_freeform_paste_has_no_sections():
     body = client.post("/api/evaluate", data={"text": "The app crashes when I click save."}).json()
-    assert body["structured"]["fields"]["description"][0]["text"] == "The app crashes when I click save."
-    assert any(f["subject"] == "description" and f["status"] == "present" for f in body["findings"])
+    assert body["structured"]["sections"] == [] and body["structured"]["extraction"]["mode"] == "free_form"
+    assert body["ie"]["processing_status"] == "partial" and body["ie"]["unevaluated_criteria"][0] == "C1"
 
 
 def test_result_page_ux(monkeypatch):
@@ -104,9 +103,8 @@ def test_result_page_ux(monkeypatch):
     r = client.post("/evaluate", data={"issue_url": "https://github.com/o/r/issues/2"})
     assert "<h2>&lt;b&gt;Boom&lt;/b&gt;</h2>" in r.text
     assert 'href="https://github.com/o/r/issues/2"' in r.text
-    findings_part = r.text.split("Findings</h2>")[1].split("Original report")[0]
-    assert "report:" not in findings_part  # internal refs hidden
-    assert "x" * 201 not in findings_part  # excerpt truncated; full text is in the original view
+    findings_part = r.text.split("Input Evaluation</h2>")[1].split("Original report")[0]
+    assert "x" * 201 not in findings_part  # quote truncated; full text is in the original view
     assert "x" * 500 in r.text.split("Original report")[1]
 
 
@@ -122,16 +120,20 @@ def with_evaluator(monkeypatch, evaluator):
     monkeypatch.setattr("bugs26.web.app.pipeline.run", lambda *a, **k: real(*a, evaluator=evaluator, **k))
 
 
-def test_lines_are_computed_when_ie_sends_only_spans(good, monkeypatch):
-    class SpanOnlyIE:
-        def evaluate(self, raw, structured):
-            ev = Evidence(kind="report_excerpt", ref=f"report:{raw.report_id}", excerpt="x", start=0, end=5)
-            f = Finding(finding_id="f", report_id=raw.report_id, source="input_evaluation", subject="s",
-                        status="present", statement="s", evidence=[ev])
-            return IEResult(report_id=raw.report_id, findings=[f])
-    with_evaluator(monkeypatch, SpanOnlyIE())
+def test_ie_evidence_lines_link_to_the_original(good, monkeypatch):
+    with_evaluator(monkeypatch, PlainIE())
     r = client.post("/evaluate", data={"text": good})
-    assert 'href="#L1">line 1</a>' in r.text
+    assert 'href="#L3">lines 3&ndash;4</a>' in r.text and '<tr id="L3">' in r.text
+
+
+class PlainIE:
+    def evaluate(self, record):
+        from bugs26.integration.models import IELines
+        from conftest import ie_evidence
+        res = ie_result(record)
+        res.criterion_findings[0].evidence[:] = [ie_evidence("x", basis="quotation", source="raw_body",
+                                                             lines=IELines(start=3, end=4), quote="q")]
+        return res
 
 
 def test_ie_failure_is_an_error_page_not_a_500(good, monkeypatch):
@@ -159,20 +161,30 @@ def test_repo_url_is_validated_for_paste():
         assert r.status_code == 400, bad
 
 
-def test_summary_and_banner_when_no_claim_could_be_checked(good):
+def test_summary_banner_and_tables(good):
     r = client.post("/evaluate", data={"text": good})
-    assert "Claims not checked: " in r.text and "Worth investigating &mdash; claims could not be checked yet" in r.text
-    assert "An environment section is present" in r.text and "A environment" not in r.text
+    assert "Partial evaluation" in r.text and "Claims: 3 identified, 3 investigated" in r.text
+    assert "Present 5" in r.text and "not evaluated 2" in r.text
+    assert "A bug description section is present" in r.text and "Not evaluated" in r.text
+    assert "<code>src/mytool/config.py:88</code>" in r.text and "Not investigated" not in r.text
 
 
-def test_unmapped_sections_are_one_line():
+def test_unmapped_sections_are_not_a_maintainer_gap():
     r = client.post("/api/evaluate", data={"text": "## Foo\na\n## Bar\nb\n## Steps\nc"}).json()
-    assert "Sections not mapped: Foo, Bar" in r["could_not_check"]
-    assert not any("not mapped to a known field" in c for c in r["could_not_check"])
+    assert not any("Foo" in c for c in r["could_not_check"])
+    assert any(d["code"] == "unrecognized_headings" and "Foo, Bar" in d["message"]
+               for d in r["structured"]["extraction"]["diagnostics"])
 
 
-def test_offline_demo_sample_shows_investigate_and_ci_rows():
+def test_offline_demo_sample_shows_claims_and_ci_rows():
     body = client.post("/api/evaluate", data={"text": sample("issue-form-report.md")}).json()
-    assert body["ie_decision"] == "investigate"
-    ci = [f for f in body["findings"] if f["source"] == "claim_investigation"]
-    assert ci and all(f["evidence"][0]["kind"] == "report_excerpt" for f in ci)
+    assert body["ie"]["processing_status"] == "partial" and len(body["ie"]["identified_claims"]) == 5
+    assert [r["findings"][0]["outcome"] for r in body["ci_results"]] == ["insufficient evidence"] * 5
+    assert [c for c in body["could_not_check"] if c.startswith("C")][:2] == [
+        "C6 not evaluated (dependency_unavailable): C6 (supporting evidence) is not judged by the placeholder.",
+        "C7 not evaluated (dependency_unavailable): C7 (clarity and specificity) is not judged by the placeholder."]
+
+
+def test_no_checkable_claims_is_shown():
+    r = client.post("/evaluate", data={"text": "## Steps\nit just breaks"})
+    assert "No claims were identified." in r.text and "was not called" in r.text

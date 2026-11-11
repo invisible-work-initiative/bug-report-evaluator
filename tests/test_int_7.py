@@ -1,40 +1,34 @@
 """INT-7 Verification: each finding, claim, and evidence item is linked to the correct report."""
 import pytest
 
-from bugs26.integration import assemble, pipeline
-from bugs26.integration.models import CIResult, Finding, IEResult, InvestigationRequest
-from conftest import sample
+from bugs26.integration import assemble, intake, pipeline
+from conftest import ci_result, sample
 
 
 def test_everything_links_to_its_report():
     a = pipeline.run(sample("good-report.md"), "paste")
     b = pipeline.run(sample("good-report.md"), "paste")
-    assert a.report_id != b.report_id
+    assert a.report_id != b.report_id and a.request_id != b.request_id and a.snapshot_id != b.snapshot_id
     for out in (a, b):
-        assert out.findings
-        for f in out.findings:
-            assert f.report_id == out.report_id
-            assert f.finding_id.startswith(out.report_id)
+        assert out.ie.request_id == out.request_id and out.ie.snapshot_id == out.snapshot_id
+        assert out.ie.criterion_findings and out.ie.identified_claims
+        section_ids = {s.section_id for s in out.structured.sections}
+        for f in out.ie.criterion_findings:
             assert f.evidence
-            for e in f.evidence:
-                assert e.ref == f"report:{out.report_id}"
+            assert all(e.section_id is None or e.section_id in section_ids for e in f.evidence)
+        for c in out.ie.identified_claims:  # a claim links to its line (R3)
+            assert c.source.section_id in section_ids | {None}
+            line = out.raw_body.split("\n")[c.source.lines.start - 1]
+            assert c.source.quote == c.claim_text and c.claim_text in line
+        assert {r.claim_id for r in out.ci_results} == {c.claim_id for c in out.ie.identified_claims}
+        for r in out.ci_results:  # CI results are keyed by (request_id, claim_id)
+            assert r.request_id == out.request_id and all(f.claim_id == r.claim_id for f in r.findings)
         assert out.structured.report_id == out.report_id
-        for f in (f for f in out.findings if f.source == "claim_investigation"):  # claims link to their lines (R3)
-            e = f.evidence[0]
-            assert e.kind == "report_excerpt" and out.original_body[e.start:e.end] == e.excerpt == f.subject
 
 
-def test_finding_for_another_report_is_rejected():
-    stray = Finding(finding_id="x", report_id="other", source="input_evaluation",
-                    subject="s", status="present", statement="s")
+def test_ci_result_for_another_request_is_rejected():
+    raw = intake.receive("x", "paste")
+    out = pipeline.run("x", "paste")
+    stray = ci_result(type("R", (), {"request_id": "other", "claim_id": "c"})())
     with pytest.raises(ValueError):
-        assemble.collect("mine", IEResult(report_id="mine", findings=[stray]), CIResult(report_id="mine"))
-
-
-def test_request_for_another_report_is_rejected(good):
-    class Ev:
-        def evaluate(self, raw, structured):
-            req = InvestigationRequest(claim_id="c", report_id="other", claim_text="x")
-            return IEResult(report_id=raw.report_id, decision="investigate", investigation_requests=[req])
-    with pytest.raises(ValueError):
-        pipeline.run(good, "paste", evaluator=Ev())
+        assemble.build_output(raw, out.structured, out.ie, [stray], [])

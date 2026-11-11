@@ -1,25 +1,19 @@
 """INT-5 Verification: check that Integration receives findings from both subsystems."""
 from bugs26.integration import pipeline
-from bugs26.integration.models import CIResult, Finding, IEResult, InvestigationRequest
-
-
-def finding(rid, source, fid):
-    return Finding(finding_id=fid, report_id=rid, source=source, subject="s", status="present", statement="s")
+from conftest import ci_result, ie_claim, ie_result
 
 
 class FakeEvaluator:
-    def evaluate(self, raw, structured):
-        req = InvestigationRequest(claim_id="c", report_id=raw.report_id, claim_text="t")
-        return IEResult(report_id=raw.report_id, decision="investigate", reason="r",
-                        findings=[finding(raw.report_id, "input_evaluation", "ie-1")], investigation_requests=[req])
+    def evaluate(self, record):
+        return ie_result(record, claims=[ie_claim(1)])
 
 
 class FakeInvestigator:
     def investigate(self, request):
-        return CIResult(report_id=request.report_id, findings=[finding(request.report_id, "claim_investigation", "ci-1")])
+        return ci_result(request, outcome="contradicted")
 
 
 def test_findings_from_both_subsystems(good):
     out = pipeline.run(good, "paste", evaluator=FakeEvaluator(), investigator=FakeInvestigator())
-    assert [(f.finding_id, f.source) for f in out.findings] == [("ie-1", "input_evaluation"),
-                                                                ("ci-1", "claim_investigation")]
+    assert [f.criterion_id for f in out.ie.criterion_findings] == [f"C{i}" for i in range(1, 8)]
+    assert [(r.claim_id, r.findings[0].outcome) for r in out.ci_results] == [("c1", "contradicted")]

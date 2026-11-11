@@ -3,39 +3,54 @@
 <style>body{font:16px sans-serif;max-width:60rem;margin:2rem auto;padding:0 1rem}
 table{border-collapse:collapse;width:100%}td,th{border:1px solid #ccc;padding:.4rem;vertical-align:top;text-align:left}
 pre{white-space:pre-wrap;margin:.2rem 0;background:#f4f4f4;padding:.3rem}
-.present,.verified{color:#176b2c}.not_found,.refuted{color:#a12020}.could_not_check,.unable_to_judge{color:#8a6100}
+.P,.supported{color:#176b2c}.M,.contradicted{color:#a12020}.U,.insufficient,.NE{color:#8a6100}
 .cnc{background:#fff4d6;padding:.5rem 1rem;border-left:4px solid #e0a800}
 .banner{padding:.6rem 1rem;border-left:6px solid #555;background:#eee;font-weight:bold}
-.investigate{border-color:#176b2c}.request_more_information{border-color:#e0a800}.do_not_investigate{border-color:#a12020}
+.completed{border-color:#176b2c}.partial{border-color:#e0a800}.invalid_input,.failed{border-color:#a12020}
 .orig td{border:0;padding:0 .5rem;font:13px monospace;white-space:pre-wrap}.orig td:first-child{color:#888;text-align:right}
 .span{color:#666;font-size:.85em}</style></head>
 <body>
-{% set DECISIONS = {"investigate": "Worth investigating", "request_more_information": "Ask the reporter for more information", "do_not_investigate": "Not investigated"} %}
-{% set STATUSES = {"present": "Present", "not_found": "Not found", "unable_to_judge": "Could not judge", "verified": "Verified", "refuted": "Refuted", "could_not_check": "Could not check"} %}
+{% set RATINGS = {"P": "Present", "M": "Missing", "N/A": "Not applicable", "U": "Unclear"} %}
+{% set STATUS = {"completed": "Evaluation completed", "partial": "Partial evaluation: some parts could not be done (see Could not check)",
+                 "invalid_input": "Input Evaluation rejected this report", "failed": "Input Evaluation failed"} %}
+{% set OUTCOMES = {"supported": "Supported", "contradicted": "Contradicted", "insufficient evidence": "Insufficient evidence"} %}
+{% macro where(e) %}{% if e.lines %}<a href="#L{{ e.lines.start }}">{% if e.lines.start == e.lines.end %}line {{ e.lines.start }}{% else %}lines {{ e.lines.start }}&ndash;{{ e.lines.end }}{% endif %}</a>{% elif e.source == "title" %}title{% else %}whole report{% endif %}{% endmacro %}
+{% set ie = output.ie %}
+{% set ci = {} %}{% for r in output.ci_results %}{% set _ = ci.update({r.claim_id: r}) %}{% endfor %}
 <p><a href="/">&larr; Evaluate another report</a></p>
-<h2>{{ output.original_title or "Bug report" }}</h2>
+<h2>{{ output.title or "Bug report" }}</h2>
 {% if issue_link %}<p><a href="{{ issue_link }}">{{ issue_link }}</a></p>{% endif %}
-{% set claims = output.findings | selectattr("source", "equalto", "claim_investigation") | list %}
-<div class="banner {{ output.ie_decision }}">{% if output.ie_decision == "investigate" and claims and not (claims | rejectattr("status", "equalto", "could_not_check") | list) %}Worth investigating &mdash; claims could not be checked yet{% else %}{{ DECISIONS[output.ie_decision] }}{% endif %}<br><span style="font-weight:normal">{{ output.ie_reason }}</span>
-{% if output.missing_information %}<br><span style="font-weight:normal">Missing information: {{ output.missing_information | join(", ") }}</span>{% endif %}</div>
+<div class="banner {{ ie.processing_status }}">{{ STATUS[ie.processing_status] }}</div>
 <h2>Summary</h2>
-<ul>{% for status, items in output.findings | groupby("status") %}<li>{{ "Claims not checked" if status == "could_not_check" else STATUSES[status] }}: {{ items | length }}</li>{% endfor %}</ul>
-<h2>Findings</h2>
-{% for key, label in [("input_evaluation", "Input Evaluation"), ("claim_investigation", "Claim Investigation")] %}
-{% set findings = output.findings | selectattr("source", "equalto", key) | list %}
-<h3>{{ label }}</h3>
-{% if findings %}
-<table><tr><th>Subject</th><th>Status</th><th>Statement</th><th>Evidence</th></tr>
-{% for f in findings %}<tr><td>{{ f.subject }}</td><td class="{{ f.status }}">{{ STATUSES[f.status] }}</td><td>{{ f.statement }}</td>
-<td>{% for e in f.evidence %}<div>{% if e.start is not none %}{% set a, b = span_lines(output.original_body, e.start, e.end) %}<a href="#L{{ a }}">{% if a == b %}line {{ a }}{% else %}lines {{ a }}&ndash;{{ b }}{% endif %}</a>{% else %}{{ e.kind }}{% endif %}{% if not e.ref.startswith("report:") %} {{ e.ref }}{% endif %}{% if e.excerpt %}<pre>{{ e.excerpt | short }}</pre>{% endif %}</div>{% endfor %}</td></tr>
+<ul>
+<li>Criteria: {% for r, label in RATINGS.items() %}{{ label }} {{ ie.criterion_findings | selectattr("rating", "equalto", r) | list | length }}, {% endfor %}not evaluated {{ ie.unevaluated_criteria | length }}</li>
+<li>Claims: {{ ie.identified_claims | length }} identified, {{ output.ci_results | length }} investigated</li>
+</ul>
+<h2>Input Evaluation</h2>
+<table><tr><th>Criterion</th><th>Rating</th><th>Status</th><th>Explanation</th><th>Evidence</th></tr>
+{% for f in ie.criterion_findings %}<tr><td>{{ f.criterion_id }}</td>
+<td class="{{ f.rating or 'NE' }}">{{ RATINGS[f.rating] if f.rating else "Not evaluated" }}{% if f.rating %} ({{ f.rating }}){% endif %}</td>
+<td>{{ f.evaluation_status }}{% if f.unevaluated_reason %} ({{ f.unevaluated_reason.code }}){% endif %}</td><td>{{ f.explanation }}</td>
+<td>{% for e in f.evidence %}<div>{{ e.basis }}, {{ where(e) }}{% if e.quote %}<pre>{{ e.quote | short }}</pre>{% endif %}<div class="span">{{ e.explanation }}</div></div>{% endfor %}</td></tr>
 {% endfor %}</table>
-{% else %}<p>No findings.</p>{% endif %}
-{% endfor %}
+{% if ie.diagnostics %}<p>Input Evaluation diagnostics:</p><ul>{% for d in ie.diagnostics %}<li>{{ d.severity }}: {{ d.code }}: {{ d.message }}</li>{% endfor %}</ul>{% endif %}
+<h2>Claims</h2>
+{% if ie.identified_claims %}
+<table><tr><th>Claim</th><th>Where</th><th>Claim Investigation</th><th>Explanation</th><th>Evidence</th></tr>
+{% for c in ie.identified_claims %}{% set r = ci.get(c.claim_id) %}{% set f = r.findings[0] if r else none %}<tr>
+<td><code>{{ c.claim_text }}</code></td><td>{{ where(c.source) }}</td>
+{% if f %}<td class="{{ f.outcome.split()[0] }}">{{ OUTCOMES[f.outcome] }}{% if r.limitation %}<div class="span">{{ r.limitation }}</div>{% endif %}</td><td>{{ f.explanation }}</td>
+<td>{% for e in f.evidence %}<div>{{ e.type }}: {{ e.reference }}<div class="span">{{ e.explanation }}</div></div>{% endfor %}</td>
+{% else %}<td colspan="3">Not investigated (see Could not check)</td>{% endif %}</tr>
+{% endfor %}</table>
+{% else %}<p>No claims were identified.</p>{% endif %}
 <h2>Could not check</h2>
 <div class="cnc"><ul>{% for item in output.could_not_check %}<li>{{ item }}</li>{% endfor %}</ul></div>
 <h2>Original report</h2>
-<table class="orig">{% for line in output.original_body.splitlines() %}<tr id="L{{ loop.index }}"><td>{{ loop.index }}</td><td>{{ line }}</td></tr>{% endfor %}</table>
+<table class="orig">{% for line in output.raw_body.split("\n") %}<tr id="L{{ loop.index }}"><td>{{ loop.index }}</td><td>{{ line.rstrip("\r") }}</td></tr>{% endfor %}</table>
 <p><a href="data:application/json;charset=utf-8,{{ output.model_dump_json(indent=2) | urlencode }}" download="evaluation-{{ output.report_id }}.json"><button type="button">Download JSON</button></a></p>
 <details><summary>Technical details</summary>
-<p>Report <code>{{ output.report_id }}</code>, source: {{ output.source }}, content hash (sha256): <code>{{ output.sha256 }}</code></p></details>
+<p>Report <code>{{ output.report_id }}</code>, request <code>{{ output.request_id }}</code>, snapshot <code>{{ output.snapshot_id }}</code>, source: {{ output.source }}, content hash (sha256): <code>{{ output.sha256 }}</code></p>
+<p>Criteria version: <code>{{ ie.provenance.criteria_version }}</code>, evaluator: <code>{{ ie.provenance.evaluator_version }}</code>, evaluated at {{ ie.provenance.evaluated_at }}</p>
+<p>Extraction: {{ output.structured.extraction.mode }}, {{ output.structured.sections | length }} sections{% for d in output.structured.extraction.diagnostics %}<br>{{ d.code }}: {{ d.message }}{% endfor %}</p></details>
 </body></html>

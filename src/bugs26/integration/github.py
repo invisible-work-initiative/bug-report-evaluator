@@ -1,4 +1,4 @@
-"""INT-1: fetch one public GitHub issue (stdlib only). Keeps title, body and html_url - nothing else (INT-9)."""
+"""INT-1: fetch one public GitHub issue (stdlib only). Keeps title, body, URL, number, label names and timestamps - no person (INT-9)."""
 import json
 import os
 import re
@@ -39,13 +39,12 @@ def parse(url: str, issue: bool):
                           else "Repository URL must look like https://github.com/OWNER/REPO.")
     owner, repo = m.group("owner", "repo")
     if f"{owner}/{repo}".lower() not in supported_repos():
-        raise GitHubError(f"{owner}/{repo} is not a supported repository. To add one, put 'owner/repo' on a new "
-                          "line in src/bugs26/integration/supported_repos.txt and restart.")
+        raise GitHubError(f"This repository is not supported yet ({owner}/{repo}).")
     return owner, repo, m.group("number")
 
 
 def fetch_issue(issue_url: str) -> dict:
-    """Return {"title", "body", "issue_url", "repo_url"} for https://github.com/{o}/{r}/issues/{n}."""
+    """Return title, body, issue_url, repo_url, issue_number, labels (names), created_at, updated_at for https://github.com/{o}/{r}/issues/{n}."""
     owner, repo, number = parse(issue_url, issue=True)
     data = _http_get(f"https://api.github.com/repos/{owner}/{repo}/issues/{number}")
     if not isinstance(data, dict):
@@ -57,4 +56,8 @@ def fetch_issue(issue_url: str) -> dict:
         "body": data.get("body") or "",
         "issue_url": data.get("html_url") or issue_url.strip(),
         "repo_url": f"https://github.com/{owner}/{repo}",
+        "issue_number": int(number),
+        "labels": [l["name"] for l in data.get("labels") or [] if isinstance(l, dict) and isinstance(l.get("name"), str)],
+        "created_at": data.get("created_at"),
+        "updated_at": data.get("updated_at"),
     }

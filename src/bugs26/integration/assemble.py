@@ -1,43 +1,39 @@
-"""INT-5/6/7/8: collect findings and build the maintainer output."""
-from .models import CIResult, Finding, IEResult, MaintainerOutput, RawReport, StructuredReport
+"""INT-5/6/7/8: build the maintainer output. IE and CI objects are passed through unchanged (INT-8)."""
+from .models import CIResult, IEResult, MaintainerOutput, RawReport, StructuredReport
 
 
-def collect(report_id: str, ie: IEResult, ci: CIResult) -> list[Finding]:
-    """INT-5 + INT-7: gather findings from both subsystems; findings must belong to this report.
-    Findings (and their Evidence) are passed through unchanged (INT-8)."""
-    findings = list(ie.findings) + list(ci.findings)
-    for f in findings:
-        if f.report_id != report_id:
-            raise ValueError(f"finding {f.finding_id} belongs to report {f.report_id}, not {report_id}")
-    return findings
+def could_not_check(ie: IEResult, ci_results: list[CIResult], notes: list[str]) -> list[str]:
+    """R4: everything that was not or could not be checked. Unrecognized headings are not listed here (IE reads
+    the raw text); they are in structured.extraction.diagnostics."""
+    out = []
+    if ie.processing_status != "completed":
+        out.append(f"Input Evaluation status: {ie.processing_status}.")
+    for f in ie.criterion_findings:
+        if f.evaluation_status == "unevaluated" and f.unevaluated_reason:
+            out.append(f"{f.criterion_id} not evaluated ({f.unevaluated_reason.code}): {f.unevaluated_reason.message}")
+        elif f.rating == "U":
+            out.append(f"{f.criterion_id} rated U (unclear): {f.explanation}")
+    if ie.claim_extraction.status != "completed":
+        out.append(f"Claim extraction {ie.claim_extraction.status}: {ie.claim_extraction.reason}")
+    for d in ie.diagnostics:
+        if d.severity == "error" and not any(d.message in line for line in out):
+            out.append(f"Input Evaluation error {d.code}: {d.message}")
+    text = {c.claim_id: c.claim_text for c in ie.identified_claims}
+    for r in ci_results:
+        parts = (["insufficient evidence"] if r.findings[0].outcome == "insufficient evidence" else []) + \
+                ([r.limitation] if r.limitation else [])
+        if parts:
+            out.append(f"Claim '{text.get(r.claim_id, r.claim_id)}': " + "; ".join(parts))
+    return out + notes or ["Input Evaluation and Claim Investigation reported no limits."]
 
 
-def parse_gaps(structured: StructuredReport) -> list[str]:
-    """What Integration itself could not map (R4)."""
-    labels = [s.label for s in structured.unmapped if s.label]
-    gaps = ["Sections not mapped: " + ", ".join(labels)] if labels else []
-    if gaps and not structured.fields:
-        gaps.append("No headings were recognised (non-English or non-standard template?)")
-    return gaps
-
-
-def build_output(raw: RawReport, structured: StructuredReport, ie: IEResult, ci: CIResult,
-                 findings: list[Finding]) -> MaintainerOutput:
-    """INT-6: combine findings into the maintainer output. could_not_check is always present (R4)."""
-    could_not_check = ie.not_checked + ci.not_checked + parse_gaps(structured)
-    if not could_not_check:
-        could_not_check = ["Input Evaluation and Claim Investigation reported no limits."]
+def build_output(raw: RawReport, structured: StructuredReport, ie: IEResult,
+                 ci_results: list[CIResult], notes: list[str]) -> MaintainerOutput:
+    """INT-6: combine the results into the maintainer output. INT-7: every result carries this report's request_id."""
+    for r in ci_results:
+        if r.request_id != raw.request_id:
+            raise ValueError(f"CI result for claim {r.claim_id} belongs to another request")
     return MaintainerOutput(
-        report_id=raw.report_id,
-        sha256=raw.sha256,
-        source=raw.source,
-        issue_url=raw.issue_url,
-        ie_decision=ie.decision,
-        ie_reason=ie.reason,
-        missing_information=ie.missing_information,
-        findings=findings,
-        could_not_check=could_not_check,
-        original_title=raw.original_title,
-        original_body=raw.original_body,
-        structured=structured,
-    )
+        report_id=raw.report_id, request_id=raw.request_id, snapshot_id=raw.snapshot_id, sha256=raw.sha256,
+        source=raw.source, issue_url=raw.issue_url, title=raw.title, raw_body=raw.raw_body,
+        ie=ie, ci_results=ci_results, could_not_check=could_not_check(ie, ci_results, notes), structured=structured)

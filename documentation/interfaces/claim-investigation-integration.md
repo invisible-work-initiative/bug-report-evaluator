@@ -1,202 +1,128 @@
 > **Draft**
 
-# Interface Agreement: Claim Investigation - Integration
+# Interface Agreement: Claim Investigation - Integration (Integration's side)
 
-This is a proposal from Integration. The Claim Investigation team should amend it.
+The Claim Investigation (CI) team owns the CI to Integration direction. Their draft 0.2 is the contract for what CI sends back: `documentation/claim_investigation_interface_agreement.md` on the `claim-investigation` branch (draft, not approved). This page does not repeat it. It adds the part their draft does not cover, the request from Integration to CI, as a proposal, and says what Integration does with the results.
 
 ## Header
 
 - **Interface name:** Claim Investigation - Integration
 - **Owners:**
   - Integration: Meshaal Aldawood, @meshaalaldawood
-  - Claim Investigation: TBD — Claim Investigation (Boyu or Qinyue)
+  - Claim Investigation: Boyu Liu, @Kilo524
 - **Status:** draft
-- **Version:** 0.2
+- **Version:** 0.3
 - **Date:** 2026-11-11
 
 ## 1 Purpose and scope
 
-Integration sends Claim Investigation (CI) one investigation request per claim, with context from the report. CI returns findings and the limits of what it checked. This page defines that exchange and the rule for when CI is called.
-
-Integration coordinates this interface. It does not decide how CI works inside, or what CI reads. Everything about CI's side is a proposal for the CI team to accept or change.
-
-Out of scope: how CI checks a claim, and which public sources it uses.
+Integration sends CI one investigation request per claim that Input Evaluation (IE) identified. CI returns one result per claim. The result (outcome, evidence, unable-to-check reason) is CI's, as in their draft sections 4.1 to 4.3. Integration connects each result to its claim and report and passes it on unchanged.
 
 ## 2 Related documents
 
-- [System requirements](../system-requirements.md): R2, R3, R4, R6
-- [Integration requirements](../subsystems/integration/requirements.md): INT-4, INT-5, INT-7, INT-8, INT-9
-- [Integration verification](../subsystems/integration/verification.md)
-- [Interface management](../interface-agreements.md)
-- [Input Evaluation - Integration agreement](input-evaluation-integration.md)
-- Team design notes: IF06, IF07, IF08 and routing rule BRE-DR.11
-- Design IDs (IF02, IF05, BRE-DR.11 ...) come from the team's SYSEN 5100 design compendium (HW7). Short definitions are in the glossary in [PROTOTYPE.md](../../PROTOTYPE.md).
-- Code: `src/bugs26/integration/models.py`, `src/bugs26/integration/interfaces.py`, `src/bugs26/integration/route.py`, `src/bugs26/stubs/claim_investigation_stub.py`
+- CI draft 0.2 (above), sections 4 (items) and 6 (CI-IN-01 to CI-IN-06).
+- [Input Evaluation - Integration agreement](input-evaluation-integration.md): IE's claims (`IEClaim`) and the routing inputs.
+- [Integration requirements](../subsystems/integration/requirements.md): INT-4, INT-5, INT-7, INT-8, INT-9. [Verification](../subsystems/integration/verification.md).
+- Code: the classes named `CI...` in `src/bugs26/integration/models.py` follow the CI draft (`CIResult`, `CIFinding`, `CIEvidence`); `CIRequest` is Integration's proposal. `interfaces.py` has the `ClaimInvestigator` Protocol. `stubs/claim_investigation_stub.py` is a placeholder.
 
-## 3 Interface description
+## 3 Routing rule
 
-Information interaction. Integration calls CI only if Input Evaluation (IE) decided `investigate` and sent at least one request (BRE-DR.11). It calls CI once per request.
+Mechanical, one call per identified claim (this replaces the earlier rule based on an IE decision, which IE's draft does not have):
 
 ```mermaid
 sequenceDiagram
     participant E as Input Evaluation
     participant I as Integration
     participant C as Claim Investigation
-    E-->>I: IEResult (decision, investigation_requests)
-    alt decision is investigate and at least one request
-        loop each request
-            I->>C: investigate(InvestigationRequest + context)
-            C-->>I: CIResult (findings, not_checked)
-        end
-    else otherwise
-        I->>I: skip CI, add reason to could_not_check
+    E-->>I: IEResult (identified_claims)
+    loop each identified claim
+        I->>C: investigate(CIRequest)
+        C-->>I: CIResult (one finding)
     end
 ```
 
-If the decision is `request_more_information` or `do_not_investigate`, Integration skips CI and reports "Claims not investigated: <reason>". If the decision is `investigate` with no requests, it reports "No specific bug claim was identified".
+Integration does not call CI, and says why in `could_not_check`, when `processing_status` is `invalid_input` or `failed`, `claim_extraction.status` is `not_performed`, or `no_checkable_claims` is `true`.
 
 ## 4 Items that cross the interface
 
-### 4.1 InvestigationRequest (Integration to CI)
+### 4.1 Request (Integration to CI): PROPOSED, not in the CI draft
 
-**Direction:** Integration to Claim Investigation.
+`CIRequest` in `models.py`. Their draft covers only CI to Integration, and their requirements document calls this input "proposed for confirmation". CI should amend it.
 
-**Description:** One claim to check, with the report context CI needs. IE supplies the claim. Integration adds `context`. (INT-4)
-
-**Characteristics:**
-
-- Format: JSON matching `InvestigationRequest` in `src/bugs26/integration/models.py`.
-- Frequency: once per claim, so zero or more per report.
-- Connection method: in-process Python call, `ClaimInvestigator.investigate(request) -> CIResult`. The Protocol is in `src/bugs26/integration/interfaces.py`. The stub in `src/bugs26/stubs/claim_investigation_stub.py` is a placeholder. It returns `could_not_check` for every request. The real CI code replaces it: pass it as `investigator=` to `pipeline.run`, or change the default there.
-
-| Field | Type | Meaning |
+| Field | Source | Meaning |
 |---|---|---|
-| `claim_id` | string | Unique id of the claim. |
-| `report_id` | string | The report it belongs to. |
-| `claim_text` | string | The claim to check. |
-| `location` | object or null | `{"start": int, "end": int}` of the claim in the original body. |
-| `context` | object | Set by Integration. See below. |
-| `ie_context` | object | IE's own context for the claim. Passed through untouched. |
+| `request_id` | Integration | The evaluation attempt; the same one IE got. |
+| `claim_id` | IE | With `request_id`, the claim's key. |
+| `claim_text` | IE | The exact claim. Not changed. |
+| `relevant_context` | IE | Exact excerpt around the claim. Not changed. |
+| `named_project_versions` | IE | Versions the report states; `[]` if none. Not changed. |
+| `repository` | Integration | `owner/project`, or `null` for pasted or uploaded reports. |
+| `issue_url` | Integration | Issue URL, or `null`. |
+| `title`, `raw_body` | Integration | The full original title and body. |
 
-`context`, set by Integration:
+No reporter identity is sent (INT-9).
 
-| Key | Type | Meaning |
+### 4.2 Result (CI to Integration)
+
+Per the CI draft: a result tied to its claim, an outcome, evidence, and the reason when the claim could not be fully checked. The field names and values in the prototype are provisional, because their draft leaves them open (section 8):
+
+| Field | Type | Note |
 |---|---|---|
-| `repo_url` | string or null | `https://github.com/OWNER/REPO`, in `supported_repos.txt`. Set for GitHub reports; a pasted or uploaded report has one only if the maintainer entered it. |
-| `issue_url` | string or null | Issue URL, GitHub source only. |
-| `fields` | object | Text of each structured section that has content, by field name: `description`, `steps_to_reproduce`, `expected_behavior`, `observed_behavior`, `environment`. Each value is a list of strings. Empty sections and `_No response_` are left out. |
+| `request_id`, `claim_id` | string | Echoed from the request. Their draft asks only for the claim id; Integration also asks for `request_id` because IE's claim key is (`request_id`, `claim_id`). |
+| `findings` | list of `CIFinding` | Exactly one is expected. |
+| `CIFinding.claim_id`, `outcome`, `explanation`, `evidence` | | `outcome` is `supported`, `contradicted` or `insufficient evidence` (their proposed values). `evidence` may be empty, as their CI-IN-03 says "when available". |
+| `CIEvidence.type`, `reference`, `explanation` | string | Their proposed required information: type, reference (path or URL), short explanation. |
+| `limitation` | string or null | Why the claim could not be fully checked (their section 4.3). |
 
-The request's `claim_text` and `location` come from IE. Integration does not extract code references or versions.
-The context has no reporter identity (INT-9).
+### 4.3 What Integration does with a result
 
-### 4.2 CIResult (CI to Integration)
+- Checks `request_id` and `claim_id` against the request. A result for another claim is a failure for this claim.
+- Checks that there is exactly one finding for the claim. Zero or several is a failure for this claim. Nothing is shown for it, and `could_not_check` says why.
+- Keeps the result, with its evidence, unchanged (INT-8, CI-IN-05).
+- Puts `insufficient evidence` outcomes and `limitation` text in `could_not_check` (CI-IN-06). It never turns them into a definite result.
+- If `investigate` raises, `could_not_check` says "Claim Investigation failed for claim ...", and the other claims go on.
 
-**Direction:** Claim Investigation to Integration.
+### 4.4 Connection
 
-**Description:** Findings for the claim, with evidence, and what CI could not check. (INT-5, INT-8)
-
-**Characteristics:**
-
-- Format: JSON matching `CIResult` in `src/bugs26/integration/models.py`.
-- Frequency: once per request.
-- Connection method: return value of `investigate`. The stub is a placeholder.
-
-`CIResult`
-
-| Field | Type | Meaning |
-|---|---|---|
-| `report_id` | string | Must equal the request's `report_id`. |
-| `findings` | list of `Finding` | One or more findings per claim. |
-| `not_checked` | list of string | Limits or failures, with reasons (IF08). Integration removes repeats across requests. |
-
-`Finding`
-
-| Field | Type | Meaning |
-|---|---|---|
-| `finding_id` | string | Unique id of the finding. |
-| `report_id` | string | The report it belongs to. Must match (INT-7). |
-| `source` | `claim_investigation` | CI uses this value. |
-| `subject` | string | Human-readable: the claim text the finding is about (the request's `claim_text`). |
-| `status` | `verified`, `refuted` or `could_not_check` | The result of checking the claim. |
-| `statement` | string | The finding in words. |
-| `evidence` | list of `Evidence` | What supports it (R3). |
-
-`Evidence`
-
-| Field | Type | Meaning |
-|---|---|---|
-| `kind` | `report_excerpt`, `file`, `url` or `note` | Type of evidence. |
-| `ref` | string | Source reference, such as a file path or URL. Passed on unchanged (INT-8). |
-| `excerpt` | string or null | Quoted text. |
-| `start`, `end` | integer or null | Span in `original_body`, for `report_excerpt`. The result page computes line numbers from it. |
+In-process Python call: `ClaimInvestigator.investigate(request: CIRequest) -> CIResult`. Provisional: their transfer mechanism is an open item.
 
 ## 5 Responsibilities
 
-**Integration:**
+**Integration:** applies the routing rule; builds `CIRequest` without changing IE's claim fields; checks and connects results; keeps limits visible (R4); keeps no reporter record (INT-9).
 
-- Apply the routing rule and call CI only when it is met.
-- Check that each request belongs to the report before sending it.
-- Add `context` to each request.
-- Pass `ie_context` through untouched.
-- Reject CI findings whose `report_id` does not match.
-- Pass evidence on unchanged, and keep limits from CI in the output (R4).
-- Keep no record of the reporter (INT-9).
-
-**Claim Investigation (proposed):**
-
-- Return one `CIResult` per request.
-- Set `report_id` on every finding, and `subject` to the claim text. Cite a `report_excerpt` with the claim's `start` and `end` when the evidence is the claim itself, so it links to its line in the report.
-- Cite evidence for every finding.
-- State what it could not check in `not_checked`, and keep findings for other claims when one claim fails.
-- Add no reporter identity to any item.
-
-If `investigate` raises, Integration adds "Claim Investigation failed: <ExceptionType>: <message>" to `could_not_check`, keeps the findings from other requests, and goes on.
+**Claim Investigation:** as in section 5 of their draft.
 
 ## 6 Interface requirements
 
-| ID | Requirement | Traces to |
-|---|---|---|
-| IF-CI-1 | Integration shall call Claim Investigation only when Input Evaluation's decision is `investigate` and it sent at least one request. | INT-4, BRE-DR.11 |
-| IF-CI-2 | Integration shall send each request with `context` containing `repo_url`, `issue_url` and `fields`. | INT-4 |
-| IF-CI-3 | Integration shall refuse a request whose `report_id` differs from the report's. | INT-7 |
-| IF-CI-4 | Claim Investigation shall return a `CIResult` whose `report_id` equals the request's, and set `report_id` on every finding. | INT-5, INT-7 |
-| IF-CI-5 | Claim Investigation shall cite evidence for every finding. | R3 |
-| IF-CI-6 | Claim Investigation shall list in `not_checked` what it could not check and why. | R4 |
-| IF-CI-7 | Integration shall pass CI findings and evidence on without change. | INT-8 |
-| IF-CI-8 | Integration shall show the reason when CI is skipped. | R4 |
-| IF-CI-9 | Neither subsystem shall add an identity field for the reporter to any item. | INT-9, R6 |
-| IF-CI-10 | Integration shall report a failed `investigate` call in `could_not_check` and keep the other findings. | R4 |
+CI's CI-IN-01 to CI-IN-06. Integration's part is CI-IN-02 (claim id kept), CI-IN-05 (evidence stays with its result) and CI-IN-06 (uncertainty kept).
 
 ## 7 Verification
 
-| ID | Method | Procedure | Test | Status |
-|---|---|---|---|---|
-| IF-CI-1 | Test | Run with each decision, with and without requests. Check when CI is called. | `tests/test_int_4.py::test_uc2_ci_skipped_unless_investigate`, `test_uc3_ci_skipped_without_requests` | Pass |
-| IF-CI-2 | Test | Run with a recording investigator. Check the context. | `tests/test_int_4.py::test_ci_receives_request_with_context` | Pass (stub) |
-| IF-CI-3 | Test | Send a request for another report. Check it is refused. | `tests/test_int_4.py::test_report_id_mismatch_is_rejected` | Pass |
-| IF-CI-4 | Test | Return a finding for another report, and a `CIResult` for another report. Check both are refused. | `tests/test_int_7.py::test_finding_for_another_report_is_rejected`, `tests/test_int_4.py::test_ci_answer_for_another_report_is_a_failure_not_a_finding` | Pass |
-| IF-CI-5 | Test | Check every CI finding has evidence. | Not written. Needs real CI code. | Open |
-| IF-CI-6 | Test | Check CI limits reach the maintainer output. | `tests/test_int_6.py::test_output_includes_collected_findings_and_r4` | Pass (stub) |
-| IF-CI-7 | Test | Check evidence equals what CI sent. | `tests/test_int_8.py::test_evidence_unchanged_from_both_subsystems` | Pass |
-| IF-CI-8 | Test | Check the skip reason is in `could_not_check`. | `tests/test_int_4.py::test_uc2_ci_skipped_unless_investigate` | Pass |
-| IF-CI-9 | Inspection | Use the INT-9 checklist on both sides. | [verification.md](../subsystems/integration/verification.md) | Open |
-| IF-CI-10 | Test | Make the investigator raise. Check the failure is in `could_not_check` and the run continues. | `tests/test_int_4.py::test_ci_failure_is_reported_and_the_run_continues` | Pass |
+| CI requirement | Method | Test | Status |
+|---|---|---|---|
+| CI-IN-01 | Test | `tests/test_int_4.py::test_one_ci_call_per_claim`, `test_ci_receives_request_with_context` | Pass (stub) |
+| CI-IN-02 | Test | `tests/test_int_4.py::test_ci_answer_for_another_claim_or_request_is_a_failure_not_a_result`, `tests/test_int_7.py::test_everything_links_to_its_report` | Pass |
+| CI-IN-03 | Inspection | CI's evidence is shown as sent: `tests/test_int_8.py::test_ie_and_ci_results_pass_through_unchanged` | Pass (fakes) |
+| CI-IN-04 | Test | `tests/test_int_4.py::test_ci_limit_and_insufficient_evidence_reach_could_not_check` | Pass (fakes) |
+| CI-IN-05 | Test | `tests/test_int_8.py`, `tests/test_int_4.py::test_zero_or_several_findings_for_a_claim_is_a_failure` | Pass |
+| CI-IN-06 | Test | `tests/test_int_4.py::test_ci_limit_and_insufficient_evidence_reach_could_not_check`, `tests/test_web.py::test_offline_demo_sample_shows_claims_and_ci_rows` | Pass |
 
-## 8 Open items
+## 8 Open items (for the CI team)
 
-Each item: owner TBD, target before Gate 2 (2026-12-07).
-
-1. Claim extraction is IE's job (Integration no longer extracts code references or versions). CI should confirm what it needs in a request (IF12), including whether `fields` is enough context.
-2. Claim granularity. What counts as one claim, so that CI returns one finding per claim?
-3. Decision vocabulary. The routing rule depends on IE's `investigate` value. CI and IE should agree on the values.
-4. Repository access. Does CI need to read or clone the repository? If so, who clones it, and from which `repo_url` and version? The prototype gives CI `repo_url`, `issue_url` and the structured `fields` (see section 4.1).
-5. Timeouts. How long may one `investigate` call take? A raised exception is handled: Integration keeps findings from other claims and adds the failure to `could_not_check`. A call that does not return is not handled.
-6. Python package or HTTP service. Integration proposes an in-process Python package that implements the `ClaimInvestigator` Protocol. If CI needs a service, the format and error handling must be defined.
-7. Is one call per claim right, or should CI get all claims for a report in one call?
+1. Confirm the request fields in 4.1.
+2. Final outcome values and field names (their section 8). The prototype uses their proposed words.
+3. Will CI echo `request_id` as well as `claim_id`?
+4. Exactly one finding per claim, as their requirements say (CI-SR-05)? Their agreement lists it as open.
+5. May a result with `insufficient evidence` have empty evidence? The prototype accepts it.
+6. Does CI read the repository itself, and at which version when the report names none?
+7. Feedback from Integration when a result cannot be connected (their section 5.3): the prototype records it in `could_not_check` and sends nothing back. Is that enough?
+8. Transport and timeout. No timeout is defined; a call that does not return is not handled.
+9. One call per claim, or one call per report?
 
 ## 9 Change history
 
 | Version | Date | Author | Change |
 |---|---|---|---|
 | 0.1 | 2026-11-11 | Integration | First draft, proposed by Integration. |
-| 0.2 | 2026-11-11 | Integration | Context has `fields` instead of versions and code references. Protocol moved to `interfaces.py`. Evidence has no line fields. CI failure handling added. |
+| 0.2 | 2026-11-11 | Integration | Context, Protocol, failure handling. |
+| 0.3 | 2026-11-11 | Integration | Conforms to the CI draft 0.2: their outcome words, one finding per claim, claim id on every result. Request to CI marked proposed. Routing is one call per IE claim; the decision-based rule (BRE-DR.11) is removed. |

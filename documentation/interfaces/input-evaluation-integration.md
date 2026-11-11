@@ -1,217 +1,116 @@
 > **Draft**
 
-# Interface Agreement: Input Evaluation - Integration
+# Interface Agreement: Input Evaluation - Integration (Integration's side)
 
-This is a proposal from Integration. The Input Evaluation team should amend it.
+The Input Evaluation (IE) team owns this interface. Their draft v1 is the contract:
+`documentation/Interface Agreemtn/input-evaluation-integration.md` on the `Input-evaluation` branch (draft, version 1 proposed, 2026-11-10). This page does not repeat it. It says only what Integration does on its side, and where the prototype follows or differs from that draft.
 
 ## Header
 
 - **Interface name:** Input Evaluation - Integration
 - **Owners:**
   - Integration: Meshaal Aldawood, @meshaalaldawood
-  - Input Evaluation: TBD — Input Evaluation (Julian or Lurui)
+  - Input Evaluation: Julian Jiang, @Yulinjiang599
 - **Status:** draft
-- **Version:** 0.2
+- **Version:** 0.3 (Integration's side only)
 - **Date:** 2026-11-11
 
 ## 1 Purpose and scope
 
-Integration gives Input Evaluation (IE) the original and structured bug report. IE gives back a decision, findings, and requests for Claim Investigation. This page defines that exchange.
+Integration gives IE one report record per evaluation attempt and takes back one evaluation result. The record and result formats, the rating scale, the identifiers and the error codes are IE's. See sections 4.1 to 4.3 of their draft.
 
-Integration coordinates this interface. It does not decide how IE works inside. Everything about IE's side is a proposal for the IE team to accept or change.
-
-Out of scope: how IE judges quality, and how IE finds claims.
+This page covers what Integration owns: receiving the report (INT-1), structuring it into IE's section schema (INT-2), sending it (INT-3), routing the claims onward (INT-4, see the [Claim Investigation agreement](claim-investigation-integration.md)), and showing the result to the maintainer (INT-5 to INT-8).
 
 ## 2 Related documents
 
-- [System requirements](../system-requirements.md): R1, R2, R3, R4, R6
-- [Integration requirements](../subsystems/integration/requirements.md): INT-2, INT-3, INT-4, INT-5, INT-7, INT-8, INT-9
-- [Integration verification](../subsystems/integration/verification.md)
-- [Interface management](../interface-agreements.md)
-- [Claim Investigation - Integration agreement](claim-investigation-integration.md)
-- Team design notes: IF02, IF03 (to IE) and IF04, IF05 (from IE)
-- Design IDs (IF02, IF05, BRE-DR.11 ...) come from the team's SYSEN 5100 design compendium (HW7). Short definitions are in the glossary in [PROTOTYPE.md](../../PROTOTYPE.md).
-- Code: `src/bugs26/integration/models.py`, `src/bugs26/integration/interfaces.py`, `src/bugs26/integration/pipeline.py`, `src/bugs26/stubs/input_evaluation_stub.py`
+- IE draft v1 (above), sections 4.1 (record), 4.2 (result), 4.3 (shared rules).
+- [Integration requirements](../subsystems/integration/requirements.md): INT-1 to INT-9. [Verification](../subsystems/integration/verification.md).
+- [System requirements](../system-requirements.md): R1, R2, R3, R4, R6.
+- Code: the classes named `IE...` in `src/bugs26/integration/models.py` are IE's contract (`IEReportRecord`, `IESection`, `IEExtraction`, `IEResult`, `IEFinding`, `IEEvidence`, `IEClaim`, ...). They reject unknown fields, as the draft requires. `interfaces.py` has the `InputEvaluator` Protocol. `stubs/input_evaluation_stub.py` is a placeholder.
 
-## 3 Interface description
-
-Information interaction. Once per report, Integration calls IE with the report. IE returns one result.
+## 3 What Integration does
 
 ```mermaid
 sequenceDiagram
     participant I as Integration
     participant E as Input Evaluation
-    I->>I: receive and structure report (INT-1, INT-2)
-    I->>E: evaluate(RawReport, StructuredReport)
-    E-->>I: IEResult (decision, findings, requests, not_checked)
-    I->>I: route and collect (INT-4, INT-5)
+    I->>I: receive, structure, check spans (INT-1, INT-2)
+    I->>E: evaluate(IEReportRecord)
+    E-->>I: IEResult
+    I->>I: match request_id + snapshot_id, route claims, build output
 ```
 
-## 4 Items that cross the interface
+## 4 Integration's side of the items
 
-### 4.1 RawReport and StructuredReport (Integration to IE)
+### 4.1 Report record (Integration to IE)
 
-**Direction:** Integration to Input Evaluation.
+Integration builds an `IEReportRecord` with these rules. Where a rule differs from the IE draft, it is marked.
 
-**Description:** The original report, kept verbatim, and the same report split into sections. Every section is an exact slice of the original body. Nothing is added. (INT-2, INT-3)
+- `raw_body` is the exact text. `""` is valid. `title` is `""` when there is none.
+- `sections` come from `intake.structure`. A section starts at a markdown heading or a bold label line (`**Expected:** text`). Markers inside code fences and HTML comments are ignored. Each section has `section_id` (`s1`, `s2`, ...), `original_label`, `status` (`provided` or `blank`), `value`, `recognition`, optional `semantic_concept`, and `source_lines`.
+- `value` is an exact slice of `raw_body`, without the heading line. A `provided` value has its leading and trailing whitespace cut off. A `blank` value keeps the exact whitespace string. "No response" and HTML comments are copied as they are; IE decides if they are useful.
+- `source_lines` are 1-based, split on LF (a CRLF is one break), and cover the heading and the value. For an empty `blank` section the range is the heading line only (the draft's example 12 for an empty last section; Integration sends the heading line).
+- `semantic_concept` uses the six concepts of the draft. Integration sets it from a small list of heading aliases (such as `Steps to reproduce`, `What happened?`, `Version`) and sends `null` plus `recognition: "unrecognized"` for any other heading.
+- A report with no headings is free-form: `sections: []`, `extraction.mode: "free_form"`. Integration does not make up a description section.
+- Text before the first heading is not a section. It stays in `raw_body` only.
+- `absent` is never sent: no template is known, so `template_id`, `field_id` and `required` are `null`.
+- `extraction.diagnostics` carries Integration's notes: `preamble_not_a_section`, `unrecognized_headings`, `no_headings_recognised`. They are not shown to the maintainer as gaps, because IE reads the raw text.
+- Before sending, Integration checks every `value` against `raw_body`, its `source_lines`, and its label (`verify_structured`). If a check fails, the run stops with an error and IE is not called.
+- `body_source` is always `current`: Integration cannot get the initial text. IE adds `not_initial_submission`.
+- `request_id` and `snapshot_id` are new for each submission. `report_id` is Integration's own link key (INT-7) and is not sent.
+- Differs from the draft (pending IE question Q3): a pasted or uploaded report has no `issue_number`, `issue_url`, `created_at` or `updated_at`, and `repository` only if the maintainer entered one. These are `null`, never made up. The draft requires them. IE should say whether `null` is acceptable for this case.
 
-**Characteristics:**
+### 4.2 Evaluation result (IE to Integration)
 
-- Format: JSON matching the pydantic models in `src/bugs26/integration/models.py`.
-- Frequency: once per report.
-- Connection method: in-process Python call, `InputEvaluator.evaluate(raw, structured) -> IEResult`. The Protocol is in `src/bugs26/integration/interfaces.py`. The stub in `src/bugs26/stubs/input_evaluation_stub.py` is a placeholder. The real IE code replaces it: pass it as `evaluator=` to `pipeline.run`, or change the default there.
+- Integration matches the result to the request by `request_id` and `snapshot_id`. A mismatch, a result without exactly one finding for each of C1 to C7 (when `completed` or `partial`), or a repeated `claim_id` is a failure: the maintainer sees an error (HTTP 502), not a result. A result with `invalid_input` and a `null` `request_id` is accepted.
+- The result is passed on as received (INT-8). The maintainer output contains the `IEResult` object itself.
+- `could_not_check` (R4) is built from: `processing_status` other than `completed`; each unevaluated criterion with its reason; each `U` rating; `claim_extraction` that is not `completed`, with its reason; each `error` diagnostic; and the notes in 4.3 below.
+- `invalid_input` and `failed` are shown as a failure, never as a completed evaluation. `partial` is shown with its limits.
+- Integration has no decision field to read. IE's draft has none, so routing does not depend on one.
 
-`RawReport`
+### 4.3 Claims
 
-| Field | Type | Meaning |
-|---|---|---|
-| `report_id` | string | New unique id for this submission. |
-| `original_title` | string or null | GitHub issue title. Null for pasted or uploaded reports. |
-| `original_body` | string | The report text, verbatim. |
-| `sha256` | string | Hash of title (or empty string), a newline, and body. |
-| `received_at` | datetime | When Integration received it (UTC). |
-| `source` | `paste`, `upload` or `github` | How the report arrived. GitHub reports are accepted only from repositories listed in `src/bugs26/integration/supported_repos.txt`. |
-| `repo_url` | string or null | Repository URL, `https://github.com/OWNER/REPO`, and the repository must be in `supported_repos.txt`. Set for GitHub reports. A pasted or uploaded report has one only if the maintainer entered it; it is validated the same way. |
-| `issue_url` | string or null | Issue URL, GitHub source only. |
+For each entry in `identified_claims`, Integration makes one Claim Investigation call (see the other agreement). Integration skips the calls, and says why in `could_not_check`, when `processing_status` is `invalid_input` or `failed`, `claim_extraction.status` is `not_performed`, or `no_checkable_claims` is `true`.
 
-There is no field for the reporter (INT-9).
+### 4.4 Connection
 
-`StructuredReport`
-
-| Field | Type | Meaning |
-|---|---|---|
-| `report_id` | string | Same id as the `RawReport`. |
-| `title` | string or null | The original title. Never derived. |
-| `fields` | map of string to list of `Section` | Sections by field name: `description`, `steps_to_reproduce`, `expected_behavior`, `observed_behavior`, `environment`. A name can hold more than one section. |
-| `unmapped` | list of `Section` | Preamble and sections with an unknown heading. |
-
-A report with no headings at all (freeform text) has its whole text in `description`. Integration does not extract code references or versions. IE finds the claims it needs, in `original_body`.
-
-`Section`
-
-| Field | Type | Meaning |
-|---|---|---|
-| `label` | string or null | Heading text as written. Null if there is none. |
-| `text` | string | Section text. |
-| `start`, `end` | integer | Character span. `original_body[start:end] == text`. |
-
-### 4.2 IEResult (IE to Integration)
-
-**Direction:** Input Evaluation to Integration.
-
-**Description:** The quality assessment, findings, and the claims for Claim Investigation. (INT-4, INT-5)
-
-**Characteristics:**
-
-- Format: JSON matching `IEResult` in `src/bugs26/integration/models.py`.
-- Frequency: once per report.
-- Connection method: return value of `evaluate`. The stub is a placeholder.
-
-`IEResult`
-
-| Field | Type | Meaning |
-|---|---|---|
-| `report_id` | string | Must equal the report's `report_id`. |
-| `decision` | `investigate`, `request_more_information` or `do_not_investigate` | What should happen next. Default `do_not_investigate`. |
-| `reason` | string | Why IE decided this. Shown to the maintainer when Claim Investigation is skipped. |
-| `missing_information` | list of string | What the report lacks. |
-| `findings` | list of `Finding` | IE's findings. |
-| `investigation_requests` | list of `InvestigationRequest` | Claims for Claim Investigation. |
-| `not_checked` | list of string | What IE could not check, with reasons (R4). |
-
-`Finding`
-
-| Field | Type | Meaning |
-|---|---|---|
-| `finding_id` | string | Unique id of the finding. |
-| `report_id` | string | The report it belongs to. Must match (INT-7). |
-| `source` | `input_evaluation` or `claim_investigation` | Who produced it. IE uses `input_evaluation`. |
-| `subject` | string | Human-readable. For IE findings, the quality criterion name, such as `steps to reproduce`. |
-| `status` | `present`, `not_found` or `unable_to_judge` for IE | The result. The model also allows `verified`, `refuted` and `could_not_check`, which are for Claim Investigation. |
-| `statement` | string | The finding in words. |
-| `evidence` | list of `Evidence` | What supports it (R3). |
-
-`Evidence`
-
-| Field | Type | Meaning |
-|---|---|---|
-| `kind` | `report_excerpt`, `file`, `url` or `note` | Type of evidence. |
-| `ref` | string | Source reference. Passed on unchanged (INT-8). |
-| `excerpt` | string or null | Quoted text. |
-| `start`, `end` | integer or null | Span in `original_body`, for `report_excerpt`. The result page computes line numbers from it. |
-
-`InvestigationRequest`
-
-| Field | Type | Meaning |
-|---|---|---|
-| `claim_id` | string | Unique id of the claim. |
-| `report_id` | string | Must match the report. |
-| `claim_text` | string | The claim to check. |
-| `location` | object or null | `{"start": int, "end": int}` in `original_body`. |
-| `context` | object | Set by Integration, not IE. See the Claim Investigation agreement. |
-| `ie_context` | object | IE's own context. Passed through untouched. |
+In-process Python call: `InputEvaluator.evaluate(record: IEReportRecord) -> IEResult`. Provisional, pending the IE transport decision (their open item 3, target 2026-11-24). No timeout is defined. If `evaluate` raises, Integration stops with "Input Evaluation failed" (HTTP 502).
 
 ## 5 Responsibilities
 
-**Integration:**
+**Integration:** keeps the original verbatim; structures it without adding anything; checks its own spans; sends one record per attempt; matches the result; forwards findings, unevaluated criteria and claims unchanged; keeps no reporter record (INT-9).
 
-- Keep the original report verbatim and check that each structured section matches it.
-- Send both versions to IE.
-- Reject IE output whose `report_id` does not match.
-- Collect IE's findings and pass evidence on unchanged.
-- Keep no record of the reporter (INT-9).
-
-**Input Evaluation (proposed):**
-
-- Return one `IEResult` per report.
-- Set `report_id` on every finding and request.
-- Cite evidence for every finding.
-- State what it could not check in `not_checked`.
-- Add no reporter identity to any item.
-
-If `evaluate` raises, Integration stops and shows "Input Evaluation failed" with the error type (HTTP 502). It does not show a partial result.
+**Input Evaluation:** as in section 5 of their draft.
 
 ## 6 Interface requirements
 
-| ID | Requirement | Traces to |
-|---|---|---|
-| IF-IE-1 | Integration shall send both the `RawReport` and the `StructuredReport` to Input Evaluation for every report. | INT-3, R1 |
-| IF-IE-2 | Integration shall ensure that every structured section is an exact slice of the original body before sending. | INT-2 |
-| IF-IE-3 | Input Evaluation shall return one `IEResult` per report, with `report_id` equal to the report's id. | INT-5, INT-7 |
-| IF-IE-4 | Input Evaluation shall set `report_id` on every finding and investigation request it returns. | INT-7, R3 |
-| IF-IE-5 | Input Evaluation shall cite evidence for every finding. | R3 |
-| IF-IE-6 | Input Evaluation shall list in `not_checked` what it could not check. | R4 |
-| IF-IE-7 | Integration shall pass IE's findings, evidence and `ie_context` on without change. | INT-8 |
-| IF-IE-8 | Neither subsystem shall add an identity field for the reporter to any item. | INT-9, R6 |
+The requirements are IE's IF-1 to IF-12. Integration's part is IF-1, IF-2, IF-3, IF-10, IF-11 and IF-12.
 
 ## 7 Verification
 
-| ID | Method | Procedure | Test | Status |
-|---|---|---|---|---|
-| IF-IE-1 | Test | Run with a recording evaluator. Check it gets both versions. | `tests/test_int_3.py::test_ie_receives_original_and_structured` | Pass (stub) |
-| IF-IE-2 | Test | Structure samples and check spans. | `tests/test_int_2.py::test_span_invariant_on_samples`, `test_verify_catches_a_wrong_span` | Pass |
-| IF-IE-3 | Test | Run with the real IE and check the result type and id. | Not written. Needs real IE code. | Open |
-| IF-IE-4 | Test | Return a finding or request for another report. Check it is refused. | `tests/test_int_7.py::test_finding_for_another_report_is_rejected`, `test_request_for_another_report_is_rejected` | Pass (stub) |
-| IF-IE-5 | Test | Check every IE finding has evidence. | Not written. | Open |
-| IF-IE-6 | Test | Check `not_checked` reaches the maintainer output, including the C6/C7 limit. | `tests/test_int_6.py::test_output_includes_collected_findings_and_r4` | Pass (stub) |
-| IF-IE-7 | Test | Check evidence equals what IE sent, and `ie_context` reaches CI untouched. | `tests/test_int_8.py::test_evidence_unchanged_from_both_subsystems`, `tests/test_int_4.py::test_ci_receives_request_with_context` | Pass |
-| IF-IE-8 | Inspection | Use the INT-9 checklist on both sides. | [verification.md](../subsystems/integration/verification.md) | Open |
+| IE requirement | Method | Test | Status |
+|---|---|---|---|
+| IF-1, IF-2 | Test | `tests/test_int_1.py` (verbatim body and metadata), `tests/test_int_3.py::test_ie_receives_original_and_structured`, `test_github_metadata_is_sent` | Pass (stub) |
+| IF-3 | Test | `tests/test_int_2.py`: `test_ie_draft_example_a1`, `test_status_blank_provided_and_exact_values`, `test_freeform_has_no_sections_and_no_invented_description`, `test_lines_split_on_lf_and_crlf_is_one_break`, `test_verify_catches_a_wrong_span`, `test_verify_catches_wrong_lines_label_and_status` | Pass |
+| IF-10 | Test | `tests/test_int_8.py::test_ie_and_ci_results_pass_through_unchanged` | Pass |
+| IF-11 | Test | `tests/test_int_4.py::test_ie_answer_for_another_request_is_a_failure`, `test_ie_result_without_seven_criteria_is_a_failure`, `test_ci_skipped_and_failure_shown_when_ie_rejected_or_failed` | Pass (fakes) |
+| IF-12 | Inspection | [verification.md](../subsystems/integration/verification.md) | Open |
+| IF-4 to IF-9 | IE's tests (their section 7) | Run against real IE code | Open |
 
-## 8 Open items
+## 8 Open items (for the IE team)
 
-Each item: owner TBD, target before Gate 2 (2026-12-07).
-
-1. Claim extraction. Integration no longer extracts code references or versions. The placeholder IE does it with a regex. Real IE returns claims in `investigation_requests`, with `location` (IF05). IE should confirm.
-2. Claim granularity. What counts as one claim? One sentence, one statement, one code reference? Integration proposes one checkable statement per request.
-3. Decision vocabulary. The prototype uses `investigate`, `request_more_information`, `do_not_investigate`. The design notes talk of "sufficient". IE should confirm or change the values.
-4. Preparation issues (IF03). The prototype does not send IE a list of parts it could not map. Should it? Integration proposes adding a field to `StructuredReport`.
-5. Timeouts. How long may `evaluate` take? A raised exception is handled (error page). A call that does not return is not.
-6. Python package or HTTP service. Integration proposes an in-process Python package that implements the `InputEvaluator` Protocol. If IE needs a service, the format and error handling must be defined.
-7. Field names in `StructuredReport.fields`. IE should confirm which sections it needs (IF11).
+1. Q3: is `null` acceptable for `repository`, `issue_number`, `issue_url`, `created_at` and `updated_at` when the report is pasted or uploaded (not from GitHub)?
+2. Q4: text before the first heading stays in `raw_body` only. Is that acceptable, or should it be an `unrecognized` section?
+3. Can Integration ever supply `body_source: "initial"`, `field_id`, `required` or `template_id`? Today it cannot, so they are `current` and `null`.
+4. Does a `U` rating count as "could not check" for the maintainer? The prototype lists it.
+5. Transport and timeout (their open item 3).
+6. Does IE need Integration to keep snapshots beyond one run (their section 4.3)? The prototype keeps nothing after the request (INT-9).
+7. Which criteria version string does Integration pin? The placeholder uses `git:b1820e5:documentation/bug-report-quality-criteria.md`.
 
 ## 9 Change history
 
 | Version | Date | Author | Change |
 |---|---|---|---|
 | 0.1 | 2026-11-11 | Integration | First draft, proposed by Integration. |
-| 0.2 | 2026-11-11 | Integration | Code references and versions moved to IE. Protocols moved to `interfaces.py`. Evidence has no line fields. Supported repositories, freeform rule and IE failure handling added. |
+| 0.2 | 2026-11-11 | Integration | Code references and versions moved to IE. Protocols moved to `interfaces.py`. |
+| 0.3 | 2026-11-11 | Integration | Conforms to the IE draft v1. Our own record, result and decision definitions removed. This page now covers Integration's side only. |

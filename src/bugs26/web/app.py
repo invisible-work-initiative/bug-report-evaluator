@@ -17,12 +17,6 @@ app = FastAPI(title="Bug report evaluator (Integration prototype)")
 templates = Jinja2Templates(directory=str(Path(__file__).parent / "templates"))
 
 
-def span_lines(body: str, start: int, end: int) -> tuple[int, int]:
-    """1-based first and last line of a character span (lines split like str.splitlines)."""
-    line = lambda offset: len((body[:offset] + "x").splitlines())
-    return line(start), line(max(start, end - 1))
-
-
 def short(text: Optional[str]) -> str:
     """Evidence excerpt for the table: at most 3 lines and about 200 characters."""
     text = text or ""
@@ -30,7 +24,6 @@ def short(text: Optional[str]) -> str:
     return cut + ("..." if cut != text else "")
 
 
-templates.env.globals.update(span_lines=span_lines)
 templates.env.filters["short"] = short
 
 
@@ -60,18 +53,19 @@ def _evaluate(text: str, file: Optional[UploadFile], issue_url: str, repo_url: s
         upload = file.file.read(MAX_BYTES + 1)  # an empty upload is ignored
     if sum([bool(text.strip()), bool(upload), bool(issue_url.strip())]) != 1:
         raise HTTPException(400, "Provide exactly one of: pasted text, an uploaded file, or a GitHub issue URL.")
-    title, issue, source = None, None, "paste"
+    title, issue, source, meta = None, None, "paste", {}
     try:
         if repo_url.strip() and not issue_url.strip():
             github.parse(repo_url, issue=False)
         if issue_url.strip():
             found = github.fetch_issue(issue_url)
             text, title, issue, repo_url, source = found["body"], found["title"], found["issue_url"], found["repo_url"], "github"
+            meta = {k: found[k] for k in ("issue_number", "labels", "created_at", "updated_at")}
         elif upload:
             text, source = upload.decode("utf-8-sig"), "upload"
         if max(len(text.encode("utf-8")), len(upload)) > MAX_BYTES:
             raise HTTPException(413, "Report is larger than 200 KB.")
-        return pipeline.run(text, source, repo_url.strip() or None, title=title, issue_url=issue)
+        return pipeline.run(text, source, repo_url.strip() or None, title=title, issue_url=issue, **meta)
     except InputEvaluationError as e:
         raise HTTPException(502, str(e)[:500])
     except ValueError as e:  # GitHubError, PreparationError, bad UTF-8, pydantic errors, id mismatches
