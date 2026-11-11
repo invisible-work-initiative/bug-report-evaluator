@@ -29,4 +29,4 @@ For each interface on the list, the two subsystems fill out the interface agreem
 
 ## Organize the agreements
 
-Agreements live in [interfaces](interfaces/). One file per interface, named after the two subsystems, for example `input-evaluation-integration.md`. That choice is [decision 0001](../decisions/0001-repository-document-organization.md).
+Agreements live in [interfaces](README.md). One file per interface, named after the two subsystems, for example `input-evaluation-integration.md`. The document map is in [documentation](../README.md).
