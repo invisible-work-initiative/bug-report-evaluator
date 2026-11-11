@@ -18,9 +18,9 @@ def ie_evidence(text="e", **kw):
                          "quote": None, "explanation": text, **kw})
 
 
-def ie_claim(n=0, text="load_config() crashes"):
+def ie_claim(n=0, text="load_config()"):  # appears on line 15 of samples/good-report.md
     return IEClaim(claim_id=f"c{n}", claim_text=text, relevant_context=text,
-                   source=ie_evidence(basis="quotation", source="raw_body", lines=IELines(start=1, end=1), quote=text),
+                   source=ie_evidence(basis="quotation", source="raw_body", lines=IELines(start=15, end=15), quote=text),
                    named_project_versions=["1.2"])
 
 

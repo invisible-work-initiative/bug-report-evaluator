@@ -40,6 +40,17 @@ def match_ie(raw: RawReport, ie: IEResult) -> None:
             raise bad(f"claim {c.claim_id} source is not a quotation of its claim_text")
     if ie.no_checkable_claims != (not ie.identified_claims if ext_done else None):
         raise bad("no_checkable_claims does not fit the claims and claim_extraction status")
+    # IF-6: every quotation is found exactly in its source, inside its lines (LF-split lines; a CRLF is one break)
+    evidence = [(f"{f.criterion_id} evidence", e) for f in ie.criterion_findings for e in f.evidence]
+    evidence += [(f"claim {c.claim_id} source", c.source) for c in ie.identified_claims]
+    for where, ev in evidence:
+        if ev.basis != "quotation":
+            continue
+        text = {"title": raw.title, "raw_body": raw.raw_body, "whole_report": raw.title + "\n" + raw.raw_body}[ev.source]
+        if ev.lines is not None and ev.source == "raw_body":
+            text = "\n".join(raw.raw_body.split("\n")[ev.lines.start - 1:ev.lines.end])
+        if not ev.quote or ev.quote not in text:
+            raise bad(f"{where}: the quotation is not found in {ev.source}" + (" at its lines" if ev.lines else ""))
 
 
 def to_investigation(raw: RawReport, ie: IEResult, investigator: ClaimInvestigator) -> tuple[list[CIResult], list[str]]:

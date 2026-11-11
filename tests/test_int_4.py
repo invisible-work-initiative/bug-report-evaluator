@@ -146,7 +146,7 @@ def test_ci_failure_is_reported_as_not_investigated_and_the_run_continues(good):
         def investigate(self, request):
             raise RuntimeError("cannot reach repo")
     out = pipeline.run(good, "paste", evaluator=evaluator(2), investigator=Boom())
-    assert out.could_not_check.count("Claim 'load_config() crashes' not investigated: RuntimeError: cannot reach repo") == 2
+    assert out.could_not_check.count("Claim 'load_config()' not investigated: RuntimeError: cannot reach repo") == 2
     assert out.ci_results == [] and out.ie.criterion_findings  # IE findings are still shown
 
 
@@ -181,7 +181,7 @@ def test_zero_or_several_findings_for_a_claim_is_a_failure(good, n):
 def test_ci_limit_and_insufficient_evidence_reach_could_not_check(good):
     out = pipeline.run(good, "paste", evaluator=evaluator(),
                        investigator=RecordingInvestigator(outcome="insufficient evidence", limitation="file not found"))
-    assert "Claim 'load_config() crashes': insufficient evidence; file not found" in out.could_not_check
+    assert "Claim 'load_config()': insufficient evidence; file not found" in out.could_not_check
     ok = pipeline.run(good, "paste", evaluator=evaluator(), investigator=RecordingInvestigator())
     assert not any("load_config" in c for c in ok.could_not_check)
 

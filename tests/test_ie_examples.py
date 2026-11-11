@@ -77,6 +77,7 @@ def test_draft_results_pass_the_consistency_check():
     a5["criterion_findings"][5] = EX["A.7"]
     a5.update(processing_status="partial", unevaluated_criteria=["C6"], diagnostics=[
         {"severity": "error", "code": "dependency_unavailable", "path": None, "message": "Evidence-access service unavailable."}])
+    raw = intake.receive(EX["A.1"]["raw_body"], "paste", title=EX["A.1"]["title"])  # a5 quotes A.1's text
     raw = raw.model_copy(update=dict(request_id=a5["request_id"], snapshot_id=a5["snapshot_id"]))
     route.match_ie(raw, IEResult.model_validate(a5))
 

@@ -4,7 +4,7 @@ from bugs26.integration.models import CIEvidence, CIFinding, CIResult, IELines
 from conftest import ie_claim, ie_evidence, ie_result
 
 IE_EVIDENCE = [
-    ie_evidence("  odd   spacing\n", basis="quotation", source="raw_body", section_id="s9", lines=IELines(start=3, end=4),
+    ie_evidence("  odd   spacing\n", basis="source_reference", source="raw_body", section_id="s9", lines=IELines(start=3, end=4),
                 quote="  odd \t spacing\n"),
     ie_evidence("none", basis="source_reference", source="title"),
 ]

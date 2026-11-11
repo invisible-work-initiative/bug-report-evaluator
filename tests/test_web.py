@@ -133,7 +133,7 @@ class PlainIE:
         from conftest import ie_evidence
         res = ie_result(record)
         res.criterion_findings[0].evidence[:] = [ie_evidence("x", basis="quotation", source="raw_body",
-                                                             lines=IELines(start=3, end=4), quote="q")]
+                                                             lines=IELines(start=3, end=4), quote="Starting the CLI")]
         return res
 
 
