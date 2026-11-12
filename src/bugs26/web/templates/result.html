@@ -15,7 +15,7 @@ pre{white-space:pre-wrap;margin:.2rem 0;background:#f4f4f4;padding:.3rem}
                  "invalid_input": "Input Evaluation rejected this report", "failed": "Input Evaluation failed"} %}
 {% set OUTCOMES = {"supported": "Supported", "contradicted": "Contradicted", "insufficient evidence": "Insufficient evidence"} %}
 {% macro where(e) %}{% if e.lines %}<a href="#L{{ e.lines.start }}">{% if e.lines.start == e.lines.end %}line {{ e.lines.start }}{% else %}lines {{ e.lines.start }}&ndash;{{ e.lines.end }}{% endif %}</a>{% elif e.source == "title" %}title{% else %}whole report{% endif %}{% endmacro %}
-{% set ie = output.ie %}{% set rec = output.record %}
+{% set ie = output.ie %}{% set failed = ie.processing_status in ["invalid_input", "failed"] %}{% set rec = output.record %}
 {% set ci = {} %}{% for r in output.ci_results %}{% set _ = ci.update({r.claim_id: r}) %}{% endfor %}
 <p><a href="/">&larr; Evaluate another report</a></p>
 <h2>{{ rec.title or "Bug report" }}</h2>
@@ -24,19 +24,19 @@ pre{white-space:pre-wrap;margin:.2rem 0;background:#f4f4f4;padding:.3rem}
 {% if output.source != "github" %}<p>Source: {{ "pasted" if output.source == "paste" else "uploaded" }} report (outside the current IE agreement, decision 0006).</p>{% endif %}
 <div class="banner {{ ie.processing_status }}">{{ STATUS[ie.processing_status] }}</div>
 <h2>Summary</h2>
-<ul>
+{% if failed %}<p>No criterion was evaluated; claims were not extracted.</p>{% else %}<ul>
 <li>Criteria: {% for r, label in RATINGS.items() %}{{ label }} {{ ie.criterion_findings | selectattr("rating", "equalto", r) | list | length }}, {% endfor %}not evaluated {{ ie.unevaluated_criteria | length }}</li>
 <li>Claims: {{ ie.identified_claims | length }} identified, {{ output.ci_results | length }} investigated</li>
-</ul>
+</ul>{% endif %}
 <h2>Input Evaluation</h2>
-<table><tr><th>Criterion</th><th>Rating</th><th>Explanation</th><th>Evidence</th></tr>
+{% if failed %}<p>No criterion was evaluated.</p>{% else %}<table><tr><th>Criterion</th><th>Rating</th><th>Explanation</th><th>Evidence</th></tr>
 {% for f in ie.criterion_findings %}<tr><td>{{ f.criterion_id }} {{ CRITERIA[f.criterion_id] }}</td>
 <td class="{{ f.rating or 'NE' }}">{{ RATINGS[f.rating] if f.rating else "Not evaluated" }}{% if f.rating %} ({{ f.rating }}){% elif f.unevaluated_reason %} ({{ f.unevaluated_reason.code }}){% endif %}</td><td>{{ f.explanation }}</td>
 <td>{% for e in f.evidence %}<div>{{ e.basis }}, {{ where(e) }}{% if e.quote %}<pre>{{ e.quote | short }}</pre>{% endif %}<div class="span">{{ e.explanation }}</div></div>{% endfor %}</td></tr>
-{% endfor %}</table>
+{% endfor %}</table>{% endif %}
 {% if ie.diagnostics %}<p>Input Evaluation diagnostics:</p><ul>{% for d in ie.diagnostics %}<li>{{ d.severity }}: {{ d.code }}: {{ d.message }}</li>{% endfor %}</ul>{% endif %}
 <h2>Claims</h2>
-{% if ie.identified_claims %}
+{% if failed %}<p>Claims were not extracted.</p>{% elif ie.identified_claims %}
 <table><tr><th>Claim</th><th>Where</th><th>Claim Investigation</th><th>Explanation</th><th>Evidence</th></tr>
 {% for c in ie.identified_claims %}{% set r = ci.get(c.claim_id) %}{% set f = r.findings[0] if r else none %}<tr>
 <td><code>{{ c.claim_text }}</code></td><td>{{ where(c.source) }}</td>
@@ -50,6 +50,13 @@ pre{white-space:pre-wrap;margin:.2rem 0;background:#f4f4f4;padding:.3rem}
 <h2>Original report</h2>
 <table class="orig">{% for line in rec.raw_body.split("\n") %}<tr id="L{{ loop.index }}"><td>{{ loop.index }}</td><td>{{ line.rstrip("\r") }}</td></tr>{% endfor %}</table>
 <p><a href="data:application/json;charset=utf-8,{{ output.model_dump_json(indent=2) | urlencode }}" download="evaluation-{{ rec.request_id }}.json"><button type="button">Download JSON</button></a></p>
+<h2>Subsystem handoffs</h2>
+<details><summary>Integration → Input Evaluation: exact input JSON</summary><pre>{{ rec.model_dump_json(indent=2) }}</pre></details>
+<details><summary>Input Evaluation → Integration: response JSON</summary><pre>{{ ie.model_dump_json(indent=2) }}</pre></details>
+<details><summary>Integration → Claim Investigation: requests sent, one per claim</summary>
+{% for item in output.ci_requests %}<h3>Claim {{ loop.index }}</h3><pre>{{ item.model_dump_json(indent=2) }}</pre>{% else %}<p>No CI request.</p>{% endfor %}</details>
+<details><summary>Claim Investigation → Integration: responses received</summary>
+{% for item in output.ci_results %}<pre>{{ item.model_dump_json(indent=2) }}</pre>{% else %}<p>No Claim Investigation response was received.</p>{% endfor %}</details>
 <details><summary>Technical details</summary>
 <p>Request <code>{{ rec.request_id }}</code>, snapshot <code>{{ rec.snapshot_id }}</code>, source: {{ output.source }}, content hash (sha256): <code>{{ output.sha256 }}</code></p>
 <p>Criteria version: <code>{{ ie.provenance.criteria_version }}</code>, evaluator: <code>{{ ie.provenance.evaluator_version }}</code>, evaluated at {{ ie.provenance.evaluated_at }}</p>

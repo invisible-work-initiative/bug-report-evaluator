@@ -5,7 +5,7 @@ import uuid
 from datetime import datetime, timezone
 from typing import Optional
 
-from .models import IEExtraction, IEExtractionDiagnostic, IELines, IEReportRecord, IESection, RawReport, StructuredReport
+from .models import IEExtraction, IELines, IEReportRecord, IESection, RawReport, StructuredReport
 
 
 class PreparationError(ValueError):
@@ -148,7 +148,8 @@ def _after_eol(body: str, i: int) -> int:
 def structure(raw: RawReport) -> StructuredReport:
     """INT-2: one IE Section per heading, each value an exact slice of the body (offsets in `spans`). No headings =
     free-form: sections []. Text before the first heading stays in raw_body only. "provided" values are trimmed by
-    moving the span; "blank" values keep the exact whitespace."""
+    moving the span; "blank" values keep their whitespace except the final line break, so the value lies inside its
+    LF-split source_lines. A blank section at the very end of the body ends on the last (empty) line, as in IE A.1."""
     body = raw.raw_body
     markers = _markers(body)
     sections, spans = [], {}
@@ -159,6 +160,8 @@ def structure(raw: RawReport) -> StructuredReport:
         provided = bool(body[start:end].strip())
         if provided:
             start, end = _trim(body, start, end)
+        else:  # blank: leave out the final line break
+            end -= 2 if body.endswith("\r\n", start, end) else 1 if end > start and body[end - 1] in "\r\n" else 0
         sid, first = f"s{i + 1}", _line(body, m["line_start"])
         sections.append(IESection(
             section_id=sid, field_id=None, required=None, original_label=m["label"], status="provided" if provided else "blank",
@@ -167,10 +170,9 @@ def structure(raw: RawReport) -> StructuredReport:
             source_lines=IELines(start=first, end=max(first, _line(body, end - 1) if end > start else _line(body, end) if end == len(body) else first))))
         spans[sid] = (start, end)
 
-    mode = "free_form" if not markers else "unsupported_template" if all(x.recognition == "unrecognized" for x in sections) else "structured"
-    diagnostics = [IEExtractionDiagnostic(code="no_headings_recognised", message="No heading matched a known concept.")]         if mode == "unsupported_template" else []
-    return StructuredReport(sections=sections, spans=spans,
-                            extraction=IEExtraction(mode=mode, template_id=None, diagnostics=diagnostics))
+    # unknown headings are valid input (IE 4.1), so any section means "structured"; unsupported_template is not emitted yet
+    return StructuredReport(sections=sections, spans=spans, extraction=IEExtraction(
+        mode="structured" if markers else "free_form", template_id=None, diagnostics=[]))
 
 
 def verify_structured(raw: RawReport, structured: StructuredReport) -> None:

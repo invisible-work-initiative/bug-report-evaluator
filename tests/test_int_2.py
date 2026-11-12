@@ -181,7 +181,7 @@ def test_preamble_is_not_a_section_and_unknown_headings_are_diagnosed():
 def test_status_blank_provided_and_exact_values():
     _, s = structured("## Steps\n\n  \n## Expected\n_No response_\n## Actual\n<!-- fill in -->")
     steps, expected, actual = s.sections
-    assert (steps.status, steps.value) == ("blank", "\n  \n")  # exact whitespace string
+    assert (steps.status, steps.value) == ("blank", "\n  ")  # whitespace string without its final line break
     assert (expected.status, expected.value) == ("provided", "_No response_")  # copied exactly; IE decides
     assert (actual.status, actual.value) == ("provided", "<!-- fill in -->")
     assert all(x.status != "absent" for x in s.sections)
@@ -256,9 +256,9 @@ def test_no_response_is_provided_text_only_the_stub_ignores_it():
     assert [meaningful_text(x) for x in s.sections] == ["", "", "boom"]
 
 
-def test_all_headings_unrecognized_is_an_unsupported_template():
+def test_all_headings_unrecognized_is_still_structured():
     out = pipeline.run("## Etapes\nun\n## Resultat\ndeux", "paste")
     ext = out.record.extraction
-    assert ext.mode == "unsupported_template" and [d.code for d in ext.diagnostics] == ["no_headings_recognised"]
+    assert ext.mode == "structured" and ext.diagnostics == []  # unknown headings are valid input; unsupported_template is not emitted
     assert [s.recognition for s in out.record.sections] == ["unrecognized", "unrecognized"]  # still sent: they are valid input
     assert not any("Etapes" in c or "recognised" in c for c in out.could_not_check)  # D6: IE reads the raw text

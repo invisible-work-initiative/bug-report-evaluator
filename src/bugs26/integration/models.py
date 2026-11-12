@@ -206,20 +206,21 @@ class CIFinding(CIModel):
 
 
 class CIResult(CIModel):
-    """Exactly one finding per claim; zero or several is a failure. request_id is Integration's ask (CI draft: claim_id only)."""
-    request_id: str
+    """Exactly one finding per claim; zero or several is a failure. request_id is optional (CI draft: claim_id only); checked when present."""
+    request_id: Optional[str] = None
     claim_id: str
     findings: list[CIFinding] = Field(default_factory=list)
     limitation: Optional[str] = None  # why the claim could not be fully checked
 
 
 class MaintainerOutput(BaseModel):
-    """record (the snapshot, IE 4.3), ie and ci_results are passed through verbatim (INT-8). could_not_check is always
-    present (R4). placeholders names the subsystems that are stubs."""
+    """record (the snapshot, IE 4.3), ie, ci_requests (as sent) and ci_results are exactly what crossed each interface
+    (INT-8). could_not_check is always present (R4). placeholders names the subsystems that are stubs."""
     sha256: str
     source: str
     placeholders: list[str] = Field(default_factory=list)
     record: IEReportRecord
     ie: IEResult
+    ci_requests: list[CIRequest] = Field(default_factory=list)
     ci_results: list[CIResult]
     could_not_check: list[str]

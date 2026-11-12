@@ -28,7 +28,7 @@ def run(text: str, source: str, repo_url: Optional[str] = None,
         raise
     except Exception as e:
         raise intake.InputEvaluationError(f"Input Evaluation failed: {type(e).__name__}: {str(e)[:200]}") from None
-    ci_results, notes = route.to_investigation(raw, ie, investigator)
+    ci_results, notes, ci_requests = route.to_investigation(raw, ie, investigator)
     placeholders = [name for name, x in (("Input Evaluation", evaluator), ("Claim Investigation", investigator))
                     if getattr(x, "PLACEHOLDER", False)]
-    return assemble.build_output(raw, record, ie, ci_results, notes, placeholders)
+    return assemble.build_output(raw, record, ie, ci_requests, ci_results, notes, placeholders)

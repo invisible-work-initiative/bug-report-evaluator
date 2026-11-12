@@ -196,7 +196,7 @@ def test_IF_3_provided_blank_unrecognized_repeated_sections(body):
         ("Version", "provided", "recognized", "environment_version")]
     assert len({x.section_id for x in sections}) == len(sections) and all(x.section_id for x in sections)
     assert sections[2].value == "_No response_"
-    assert sections[3].value == "" and sections[4].value.strip() == "" and sections[4].value in raw.raw_body
+    assert sections[3].value == "" and sections[4].value == "   " and sections[4].value in raw.raw_body
     assert sections[1].value != sections[5].value  # not merged
     nl = "\r\n" if "\r\n" in body else "\n"
     assert sections[1].value == f"1. Open{nl}2. Save"  # exact text, inner line break kept
@@ -204,11 +204,8 @@ def test_IF_3_provided_blank_unrecognized_repeated_sections(body):
         assert x.field_id is None and x.required is None  # template unknown
         assert x.semantic_concept is None or (x.semantic_concept in CONCEPTS and x.recognition == "recognized")
         assert x.source_lines is not None
-        # every value is inside its source_lines. A whitespace-only (blank) value keeps its final line break, which is the
-        # terminator of the last line and so is not part of the LF-split line text: compare without it (draft is silent).
-        assert x.value.rstrip("\r\n") in lines_text(raw.raw_body, x.source_lines)
-        if x.status == "provided":
-            assert x.value in lines_text(raw.raw_body, x.source_lines)
+        # strict: every value, blank ones included (they leave out their final line break), is inside its source_lines
+        assert x.value in lines_text(raw.raw_body, x.source_lines)
         assert x.value in raw.raw_body
         assert x.original_label in lines_text(raw.raw_body, IELines(start=x.source_lines.start, end=x.source_lines.start))
     # encodings: the record round-trips as JSON with these exact strings
@@ -217,12 +214,12 @@ def test_IF_3_provided_blank_unrecognized_repeated_sections(body):
     assert back["extraction"] == {"mode": "structured", "template_id": None, "diagnostics": []}
 
 
-def test_IF_3_all_unrecognized_headings_is_unsupported_template_with_diagnostics():
+def test_IF_3_all_unrecognized_headings_are_valid_structured_input():
     """Section 7: "Fixtures with provided, blank, absent, unrecognized, and repeated sections. Check the encodings
     and that every `value` is found in its `source_lines`." (Draft 4.1: diagnostics non-empty for
     unsupported_template.)"""
     raw, s, record = structured("### Foo\nbar\n### Baz\nqux\n")
-    assert record.extraction.mode == "unsupported_template" and record.extraction.diagnostics
+    assert record.extraction.mode == "structured" and record.extraction.diagnostics == []  # unsupported_template: not emitted yet
     assert {x.recognition for x in record.sections} == {"unrecognized"} and record.raw_body == raw.raw_body
 
 
@@ -284,7 +281,8 @@ def test_IF_5_invalid_input_result_is_shown_as_a_failure(monkeypatch, make, bann
     page = TestClient(app).post("/evaluate", data={"text": "It does not work. Please help."}).text
     assert banner in page and "Evaluation completed" not in page
     assert not any(f"C{i} {CRITERIA[f'C{i}']}" in page for i in range(1, 8))  # no finding rendered
-    assert "No claims were identified" in page
+    assert "No criterion was evaluated; claims were not extracted" in page and "No claims were identified" not in page
+    assert any("No criterion was evaluated: Input Evaluation returned" in x for x in out.could_not_check)
 
 
 def bad_results():
@@ -509,9 +507,9 @@ def test_IF_8_interrupted_extraction(status, n_claims):
               claim_in(BODY8, "Open `main.py` and call `save()`.", "claim-2")][:n_claims]
     err = {"severity": "error", "code": "internal_error", "path": None, "message": "extraction interrupted"}
     out, ci, rec = run8(claims, processing_status="partial", claim_extraction=IEClaimExtraction(status=status, reason="interrupted"),
-                        no_checkable_claims=None, diagnostics=[IEDiagnostic(**err)])
+                        no_checkable_claims=False if claims else None, diagnostics=[IEDiagnostic(**err)])
     assert_forwarded(ci, rec, claims)
-    assert out.ie.no_checkable_claims is None  # never turned into "no claims"
+    assert out.ie.no_checkable_claims is (False if claims else None)  # false if claims were found, never "no claims"
     assert any(f"Claim extraction {status}: interrupted" in x for x in out.could_not_check)
 
 

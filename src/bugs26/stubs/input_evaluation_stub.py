@@ -66,7 +66,7 @@ class StubInputEvaluator:
                 findings.append(IEFinding(
                     criterion_id=cid, criteria_version=CRITERIA_VERSION, evaluation_status="unevaluated", rating=None,
                     explanation=PREFIX + f"{name} was not evaluated.", unevaluated_reason=IEUnevaluatedReason(
-                        code="unsupported_content" if cid in CONCEPTS else "dependency_unavailable", message=f"{cid}: {why}"),
+                        code="unsupported_content" if cid in CONCEPTS else "dependency_unavailable", message=why),
                     evidence=[IEEvidence(basis="source_reference", source="whole_report", section_id=None, lines=None,
                                          quote=None, explanation="Not evaluated by the placeholder.")]))
 

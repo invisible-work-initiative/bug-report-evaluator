@@ -201,8 +201,8 @@ def test_offline_demo_sample_lists_claims_as_not_investigated():
     assert body["ci_results"] == []  # the CI stub invents no outcome
     assert sum("not investigated: NotImplementedError" in c for c in body["could_not_check"]) == 5
     assert [c for c in body["could_not_check"] if c.startswith("C")][:2] == [
-        "C6 not evaluated (dependency_unavailable): C6: The placeholder does not judge this criterion.",
-        "C7 not evaluated (dependency_unavailable): C7: The placeholder does not judge this criterion."]
+        "C6 not evaluated (dependency_unavailable): The placeholder does not judge this criterion.",
+        "C7 not evaluated (dependency_unavailable): The placeholder does not judge this criterion."]
 
 
 def test_no_checkable_claims_is_shown():
