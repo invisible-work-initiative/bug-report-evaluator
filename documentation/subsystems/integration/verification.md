@@ -34,6 +34,15 @@ Inspect the code on the branch under review. Record the reviewer, the date and t
 - [ ] The JSON download on the result page is a `data:` link. The server keeps nothing.
 - [ ] The placeholder IE and CI stubs add no identity fields. Real IE and CI code must be inspected the same way when it replaces them.
 
+## Interface agreement tests (Integration's side)
+
+| Agreement | Rows covered | Test file | Status |
+|---|---|---|---|
+| Input Evaluation v1, section 7 | IF-1, IF-2, IF-3, IF-5, IF-6, IF-8, IF-10, IF-11 (malformed result only), IF-12 (automated part) | `tests/test_ie_agreement.py` | 67 pass, 3 skipped: IF-11 resend cases wait for the transport decision (IE open item 3) |
+| Claim Investigation, section 7 | CI-IN-01 to CI-IN-06, plus 5.3 feedback and extra fields kept while CI's schema is open | `tests/test_ci_agreement.py` | 7 pass, run against a fake CI |
+
+IE rows IF-4, IF-7 and IF-9 are IE's own. The human inspections are not automated: IF-6 (does the evidence support the finding), IF-12 (logs on both sides) and CI-IN-03.
+
 ## Not yet covered
 
 - Real IE and CI code. All tests use stubs or fakes. The tests named in the two interface agreements must be re-run against the real code.
