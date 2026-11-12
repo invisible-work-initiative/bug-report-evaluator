@@ -1,24 +1,12 @@
 # Where to put documents
 
-Put the file in the place below and open a pull request. It is official once it is on `main` and a teammate has approved it. Until then, write `Draft` at the top. Other subsystems can read a draft. They build to the merged document.
+Put each document in the folder for its type, with the subsystem name in the filename when one subsystem owns it. Open a pull request. A document is official once it is on `main` and the required owners have approved it. Until then, write `Draft` at the top.
 
-| Document | Where it goes |
+| Document | Folder |
 |---|---|
-| System requirements | [system-requirements.md](system-requirements.md) |
-| Concept of operations | `conops.md` in this folder |
-| System tests and the baseline | `system-verification.md` in this folder |
-| A subsystem's requirements, tests, or working agreement | That subsystem's folder below |
-| An interface agreement | [interfaces](interfaces/) |
-| A decision worth remembering | [decisions](../decisions/) |
-| A weekly update | Slack `#bugs26` |
+| Interface agreements and management | [interfaces](interfaces/README.md) |
+| Team working agreements | [working-agreements](working-agreements/README.md) |
+| System and subsystem requirements, verification, ConOps | [requirements](requirements/README.md) |
+| Decisions worth remembering | [decisions](decisions/README.md) |
 
-| Subsystem | Folder |
-|---|---|
-| Software Systems | [software-systems](subsystems/software-systems/) |
-| Input Evaluation | [input-evaluation](subsystems/input-evaluation/) |
-| Claim Investigation | [claim-investigation](subsystems/claim-investigation/) |
-| Integration | [integration](subsystems/integration/) |
-
-Name an interface file after the two subsystems, for example `input-evaluation-integration.md`. Both owners approve that pull request. The process is on the [interface page](interface-agreements.md).
-
-This map is [decision 0001](../decisions/0001-repository-document-organization.md).
+Each folder's README gives the naming pattern and template guidance. A weekly update goes in Slack `#bugs26`.

@@ -1,3 +1,3 @@
 # Moved
 
-The Claim Investigation working agreement is now [documentation/subsystems/claim-investigation/working-agreement.md](documentation/subsystems/claim-investigation/working-agreement.md).
+The Claim Investigation working agreement is now [documentation/working-agreements/claim-investigation.md](documentation/working-agreements/claim-investigation.md).

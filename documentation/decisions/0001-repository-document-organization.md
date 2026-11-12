@@ -10,7 +10,7 @@ Files had no fixed place. System requirements sat in `documentation/`, one worki
 
 ## Decision
 
-Follow [Where to put documents](../documentation/README.md).
+Follow [Where to put documents](../README.md).
 
 System requirements stay in `documentation/system-requirements.md`. Each subsystem keeps its own documents in `documentation/subsystems/<name>/`. Interface agreements go in `documentation/interfaces/`, one file per interface, named after the two subsystems. Decision records stay in this folder.
 

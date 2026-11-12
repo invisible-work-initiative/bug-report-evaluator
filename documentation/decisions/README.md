@@ -4,4 +4,4 @@ One short file per decision: `0001-short-title.md`, `0002-short-title.md`. Use t
 
 | | |
 |---|---|
-| [0001](0001-repository-document-organization.md) | Where documents go |
+| [0001](0001-repository-document-organization.md) | Earlier document layout; the current layout is in [documentation](../README.md) |
