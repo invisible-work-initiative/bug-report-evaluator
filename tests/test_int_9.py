@@ -2,8 +2,8 @@
 import re
 from pathlib import Path
 
-from bugs26.integration import github, models, pipeline
-from bugs26.web import __main__ as runner
+from integration import github, models, pipeline
+from integration import __main__ as runner
 
 SRC = Path(models.__file__).resolve().parents[1]
 IDENTITY = re.compile(r"author|reporter|user|username|login|email|ip_addr|assignee", re.I)

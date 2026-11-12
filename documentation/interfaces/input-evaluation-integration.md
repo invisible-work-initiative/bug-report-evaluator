@@ -24,9 +24,9 @@ This page covers what Integration owns: receiving the report (INT-1), structurin
 ## 2 Related documents
 
 - IE draft v1 (above), sections 4.1 (record), 4.2 (result), 4.3 (shared rules).
-- [Integration requirements](../subsystems/integration/requirements.md): INT-1 to INT-9. [Verification](../subsystems/integration/verification.md).
-- [System requirements](../system-requirements.md): R1, R2, R3, R4, R6.
-- Code: the classes named `IE...` in `src/bugs26/integration/models.py` are IE's contract (`IEReportRecord`, `IESection`, `IEExtraction`, `IEResult`, `IEFinding`, `IEEvidence`, `IEClaim`, ...). They reject unknown fields, as the draft requires. `interfaces.py` has the `InputEvaluator` Protocol. `stubs/input_evaluation_stub.py` is a placeholder.
+- [Integration requirements](../requirements/integration.md): INT-1 to INT-9. [Verification](../requirements/integration-verification.md).
+- [System requirements](../requirements/system.md): R1, R2, R3, R4, R6.
+- Code: the classes named `IE...` in `src/integration/models.py` are IE's contract (`IEReportRecord`, `IESection`, `IEExtraction`, `IEResult`, `IEFinding`, `IEEvidence`, `IEClaim`, ...). They reject unknown fields, as the draft requires. `interfaces.py` has the `InputEvaluator` Protocol. `src/input_evaluation/placeholder.py` is a placeholder.
 
 ## 3 What Integration does
 
@@ -91,11 +91,11 @@ The requirements are IE's IF-1 to IF-12. Integration's part is IF-1, IF-2, IF-3,
 
 | IE requirement | Method | Test | Status |
 |---|---|---|---|
-| IF-1, IF-2 | Test | `tests/test_int_1.py` (verbatim body and metadata), `tests/test_int_3.py::test_ie_receives_original_and_structured`, `test_github_metadata_is_sent` | Pass (stub) |
+| IF-1, IF-2 | Test | `tests/test_int_1.py` (verbatim body and metadata), `tests/test_int_3.py::test_ie_receives_original_and_structured`, `test_github_metadata_is_sent` | Pass (placeholder) |
 | IF-3 | Test | `tests/test_int_2.py`: `test_ie_draft_example_a1`, `test_status_blank_provided_and_exact_values`, `test_freeform_has_no_sections_and_no_invented_description`, `test_lines_split_on_lf_and_crlf_is_one_break`, `test_verify_catches_a_wrong_span`, `test_verify_catches_wrong_lines_label_and_status` | Pass |
 | IF-10 | Test | `tests/test_int_8.py::test_ie_and_ci_results_pass_through_unchanged` | Pass |
 | IF-11 | Test | `tests/test_int_4.py::test_ie_answer_for_another_request_is_a_failure`, `test_inconsistent_ie_result_is_a_failure`, `test_ci_skipped_and_failure_shown_when_ie_rejected_or_failed` | Pass (fakes) |
-| IF-12 | Inspection | [verification.md](../subsystems/integration/verification.md) | Open |
+| IF-12 | Inspection | [verification.md](../requirements/integration-verification.md) | Open |
 | IF-4 to IF-9 | IE's tests (their section 7) | Run against real IE code | Open |
 
 ## 8 Open items (for the IE team)

@@ -1,6 +1,6 @@
 """INT-8 Verification: transfer a finding and check that its evidence references remain unchanged."""
-from bugs26.integration import pipeline
-from bugs26.integration.models import CIEvidence, CIFinding, CIResult, IELines
+from integration import pipeline
+from integration.models import CIEvidence, CIFinding, CIResult, IELines
 from conftest import ie_claim, ie_evidence, ie_result
 
 IE_EVIDENCE = [

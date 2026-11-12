@@ -2,9 +2,9 @@
 Sections follow the IE draft v1 (Section object); spans stay exact."""
 import pytest
 
-from bugs26.integration import intake, pipeline
-from bugs26.integration.models import IELines
-from bugs26.stubs.input_evaluation_stub import meaningful_text
+from integration import intake, pipeline
+from integration.models import IELines
+from input_evaluation.placeholder import meaningful_text
 from conftest import NAMES, sample
 
 
@@ -197,7 +197,7 @@ def test_title_is_never_derived_from_the_body():
     assert structured("x", title="Given")[0].title == "Given"
 
 
-def test_comment_only_section_is_not_meaningful_to_the_stub():
+def test_comment_only_section_is_not_meaningful_to_the_placeholder():
     _, s = structured("## Steps\n<!-- describe the steps -->\n## Expected\n<!--\nmulti\nline\n-->\nreal")
     steps, expected = s.sections
     assert meaningful_text(steps) == "" and meaningful_text(expected) == "real"
@@ -250,7 +250,7 @@ def test_verify_catches_wrong_lines_label_and_status():
             intake.verify_structured(raw, s)
 
 
-def test_no_response_is_provided_text_only_the_stub_ignores_it():
+def test_no_response_is_provided_text_only_the_placeholder_ignores_it():
     _, s = structured("### Steps\n_No response_\n### Expected\n<!-- fill in -->\n### Actual\nboom")
     assert [x.value for x in s.sections] == ["_No response_", "<!-- fill in -->", "boom"]
     assert [meaningful_text(x) for x in s.sections] == ["", "", "boom"]

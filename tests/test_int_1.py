@@ -4,8 +4,8 @@ from pathlib import Path
 
 import pytest
 
-from bugs26.integration import github, intake
-from bugs26.integration.models import RawReport
+from integration import github, intake
+from integration.models import RawReport
 
 ISSUE = {"title": "Crash on start", "body": "## Steps to reproduce\nrun it", "html_url": "https://github.com/o/r/issues/7",
          "number": 7, "created_at": "2026-11-01T14:00:00Z", "updated_at": "2026-11-02T09:30:00Z",

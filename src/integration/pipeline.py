@@ -4,8 +4,8 @@ from typing import Optional
 from . import assemble, intake, route
 from .interfaces import ClaimInvestigator, InputEvaluator
 from .models import IEResult, MaintainerOutput
-from ..stubs.claim_investigation_stub import StubClaimInvestigator
-from ..stubs.input_evaluation_stub import StubInputEvaluator
+from claim_investigation.placeholder import PlaceholderClaimInvestigator
+from input_evaluation.placeholder import PlaceholderInputEvaluator
 
 
 def run(text: str, source: str, repo_url: Optional[str] = None,
@@ -15,8 +15,8 @@ def run(text: str, source: str, repo_url: Optional[str] = None,
     """receive (INT-1) -> structure + check (INT-2) -> IE (INT-3) -> CI per claim (INT-4) -> output (INT-5..8).
     meta: issue_number, labels, created_at, updated_at (GitHub). Raises PreparationError or InputEvaluationError;
     a Claim Investigation failure goes to could_not_check instead."""
-    evaluator = evaluator or StubInputEvaluator()
-    investigator = investigator or StubClaimInvestigator()
+    evaluator = evaluator or PlaceholderInputEvaluator()
+    investigator = investigator or PlaceholderClaimInvestigator()
     raw = intake.receive(text, source, repo_url, title, issue_url, **meta)
     structured = intake.structure(raw)
     intake.verify_structured(raw, structured)

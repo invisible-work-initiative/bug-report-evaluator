@@ -1,10 +1,34 @@
-# Integration Subsystem Prototype (iteration 7)
+# Integration Subsystem Prototype
 
 A small, in-memory prototype of the **Integration** subsystem of the bug report evaluator. It takes a bug report (pasted, uploaded as `.md`/`.txt`, or fetched from a public GitHub issue URL), preserves and structures it, runs Input Evaluation, sends each identified claim to Claim Investigation, and returns the combined results to the maintainer as an HTML page or JSON.
 
-Input Evaluation (IE) and Claim Investigation (CI) belong to other teams. Here they are **placeholder stubs** behind small interfaces so the real code can be dropped in. Their data formats are the other teams' drafts, not ours: the `IE...` classes in `integration/models.py` follow the IE draft v1, the `CI...` classes follow the CI draft 0.2 (provisional). Integration's own classes are `RawReport`, `StructuredReport`, `CIRequest` (proposed) and `MaintainerOutput`.
+Input Evaluation (IE) and Claim Investigation (CI) belong to other teams. Here they are **placeholders** behind small interfaces so the real code can be dropped in. Their data formats are the other teams' drafts, not ours: the `IE...` classes in `integration/models.py` follow the IE draft v1, the `CI...` classes follow the CI draft 0.2 (provisional). Integration's own classes are `RawReport`, `StructuredReport`, `CIRequest` (proposed) and `MaintainerOutput`.
 
 No database, no LLM. The only network call is the optional GitHub issue fetch (stdlib `urllib`). Nothing is written to disk or logged.
+
+## Layout
+
+One folder per subsystem in `src/`. Each subsystem team owns its folder.
+
+```
+src/
+  integration/          Integration (ours): intake, routing, output, web page
+    models.py           data formats: IE*/CI* follow the other teams' drafts, the rest are ours
+    interfaces.py       the two plug-in points: InputEvaluator, ClaimInvestigator
+    intake.py           receive and structure the report (INT-1, INT-2)
+    route.py            check IE's answer, one CI call per claim (INT-4, INT-5, INT-7)
+    assemble.py         build the maintainer output (INT-5 to INT-8)
+    pipeline.py         runs the steps in order
+    github.py           fetch one GitHub issue by URL
+    web.py, templates/  the maintainer page and JSON API (INT-1, INT-6)
+    __main__.py         `python -m integration` starts the server
+  input_evaluation/
+    placeholder.py      stands in for Input Evaluation until that team's code arrives
+  claim_investigation/
+    placeholder.py      stands in for Claim Investigation; investigates nothing
+tests/                  test_int_N.py checks requirement INT-N; *_agreement.py check the interface agreements
+samples/                example bug reports to try by hand and used by the tests
+```
 
 ## Run
 
@@ -16,7 +40,7 @@ python -m venv .venv
 source .venv/bin/activate           # macOS / Linux
 python -m pip install -e ".[dev]"
 python -m pytest
-python -m bugs26.web                # http://127.0.0.1:8000/  (access log is off, INT-9)
+python -m integration                # http://127.0.0.1:8000/  (access log is off, INT-9)
 ```
 
 Paste a report, upload one from `samples/`, or give a GitHub issue URL (exactly one source). `samples/issue-form-report.md` is a synthetic issue-form style report that works offline and shows the claims table with Claim Investigation rows. JSON is also available (on Windows use `curl.exe`, plain `curl` is a PowerShell alias):
@@ -24,12 +48,12 @@ Paste a report, upload one from `samples/`, or give a GitHub issue URL (exactly 
 The optional repository URL for pasted or uploaded reports must be `https://github.com/OWNER/REPO` and listed in `supported_repos.txt`.
 Set `GITHUB_TOKEN` to raise GitHub's rate limit (optional).
 
-**Supported repositories (INT-1, admin note):** GitHub issues are accepted only from the repositories in `src/bugs26/integration/supported_repos.txt` (one `owner/repo` per line, `#` comments, case-insensitive). The maintainer sees "This repository is not supported yet". To support another, add a line and restart the server.
+**Supported repositories (INT-1, admin note):** GitHub issues are accepted only from the repositories in `src/integration/supported_repos.txt` (one `owner/repo` per line, `#` comments, case-insensitive). The maintainer sees "This repository is not supported yet". To support another, add a line and restart the server.
 
 ## Pipeline
 
 ```
-paste / .md,.txt upload / GitHub issue URL                 web/app.py (+ integration/github.py)
+paste / .md,.txt upload / GitHub issue URL                 integration/web.py (+ integration/github.py)
   -> intake.receive()            INT-1   RawReport: title + raw_body verbatim, request_id (the INT-7 key) and snapshot_id, GitHub metadata
   -> intake.structure()          INT-2   StructuredReport: IE-style sections (exact slices of raw_body, 1-based source_lines)
   -> intake.verify_structured()  INT-2   every value, line range and label must check out, else PreparationError (run stops)
@@ -57,7 +81,7 @@ paste / .md,.txt upload / GitHub issue URL                 web/app.py (+ integra
 
 ## Plugging in your subsystem
 
-1. Implement `InputEvaluator` or `ClaimInvestigator` from `src/bugs26/integration/interfaces.py` (one method each).
+1. Implement `InputEvaluator` or `ClaimInvestigator` from `src/integration/interfaces.py` (one method each).
 2. Take and return the models from `integration/models.py` (the `IE...` or `CI...` classes; unknown fields are rejected).
 3. Try it: `pipeline.run(text, "paste", evaluator=MyIE(), investigator=MyCI())`.
 4. Make it the default by changing the two defaults in `integration/pipeline.py`.
@@ -86,12 +110,12 @@ The IDs below come from the team's SYSEN 5100 design compendium (HW7), which is 
 
 | Req | Implemented in | Test |
 |---|---|---|
-| INT-1 receive reports (paste, upload, GitHub) | `intake.receive`, `integration/github.py`, `web/app.py` | `tests/test_int_1.py`, `tests/test_web.py` |
+| INT-1 receive reports (paste, upload, GitHub) | `intake.receive`, `integration/github.py`, `integration/web.py` | `tests/test_int_1.py`, `tests/test_web.py` |
 | INT-2 preserve and structure | `intake.receive` (verbatim), `intake.structure`, `intake.verify_structured` | `tests/test_int_2.py` |
 | INT-3 send both versions to IE | `pipeline.run`, `intake.to_record`, `InputEvaluator` protocol | `tests/test_int_3.py` |
 | INT-4 requests + context to CI | `route.to_investigation`, `ClaimInvestigator` protocol | `tests/test_int_4.py` |
 | INT-5 collect findings | `route.match_ie`, `assemble.build_output` | `tests/test_int_5.py` |
-| INT-6 output to maintainer | `assemble.build_output`, `web/app.py`, templates | `tests/test_int_6.py`, `tests/test_web.py` |
+| INT-6 output to maintainer | `assemble.build_output`, `integration/web.py`, templates | `tests/test_int_6.py`, `tests/test_web.py` |
 | INT-7 reports linked to findings | `request_id`/`snapshot_id` matching, `claim_id` on CI results; `route`/`assemble` reject mismatches | `tests/test_int_7.py`, `tests/test_int_4.py` |
 | INT-8 evidence unchanged | `IEResult` and `CIResult` objects are placed in the output as received | `tests/test_int_8.py` |
 | INT-9 no reporter linking | no identity field in any model; GitHub `user` etc. dropped; no storage; no logging; access log off | `tests/test_int_9.py` |
@@ -99,8 +123,8 @@ The IDs below come from the team's SYSEN 5100 design compendium (HW7), which is 
 
 ## Placeholders / not done
 
-- `stubs/input_evaluation_stub.py`: rates a criterion `P` (with a quotation) when a section for it has content, and otherwise leaves it unevaluated (`unsupported_content`): a missing heading does not mean missing information, so it never says `M`. C6 and C7 are always unevaluated (`dependency_unavailable`), so the status is `partial`. It finds claims by regex and pins the criteria version `git:b1820e5:documentation/bug-report-quality-criteria.md`. Its findings are labelled `[PLACEHOLDER ...]`, and the page says Input Evaluation is a placeholder.
-- `stubs/claim_investigation_stub.py`: raises "Claim Investigation not connected" and invents no outcome, so every claim is listed under Could not check as not investigated. The page says Claim Investigation is a placeholder.
+- `src/input_evaluation/placeholder.py`: rates a criterion `P` (with a quotation) when a section for it has content, and otherwise leaves it unevaluated (`unsupported_content`): a missing heading does not mean missing information, so it never says `M`. C6 and C7 are always unevaluated (`dependency_unavailable`), so the status is `partial`. It finds claims by regex and pins the criteria version `git:b1820e5:documentation/bug-report-quality-criteria.md`. Its findings are labelled `[PLACEHOLDER ...]`, and the page says Input Evaluation is a placeholder.
+- `src/claim_investigation/placeholder.py`: raises "Claim Investigation not connected" and invents no outcome, so every claim is listed under Could not check as not investigated. The page says Claim Investigation is a placeholder.
 - `intake.structure` is rule-based and will miss unusual formats; unmatched headings stay visible as `unrecognized` sections, nothing is guessed.
 - GitHub fetch handles one issue by URL only (no webhooks, no listing, no comments). The GitHub call runs in the server's threadpool (endpoints are plain `def`) and is not cached. Owner/repo must be ASCII, `.`/`..` are refused.
 - JSON download on the result page is a `data:` link, so nothing is kept on the server.

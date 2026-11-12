@@ -10,7 +10,7 @@ Integration has to call Input Evaluation (IE) and Claim Investigation (CI). Neit
 
 ## Decision
 
-For the alpha, Integration calls IE and CI as Python function calls. Each call goes through a `typing.Protocol` interface, so the real subsystem or a stub can sit behind it. This is provisional. It waits for IE's decision on 2026-11-24 and for a CI decision that does not exist yet. We invent no timeout number.
+For the alpha, Integration calls IE and CI as Python function calls. Each call goes through a `typing.Protocol` interface, so the real subsystem or a placeholder can sit behind it. This is provisional. It waits for IE's decision on 2026-11-24 and for a CI decision that does not exist yet. We invent no timeout number.
 
 ## Alternatives we considered
 

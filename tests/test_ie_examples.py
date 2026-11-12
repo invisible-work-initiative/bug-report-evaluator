@@ -1,4 +1,4 @@
-"""Every example in the IE draft v1 appendix (A.1-A.7, copied to fixtures/ie_examples.json) is accepted or rejected
+"""Every example in the IE draft v1 appendix (A.1-A.7, copied to ie_examples.json) is accepted or rejected
 exactly as the draft intends, and Integration's own output for A.1 equals the draft's record."""
 import copy
 import json
@@ -7,10 +7,10 @@ from pathlib import Path
 import pytest
 from pydantic import ValidationError
 
-from bugs26.integration import intake, route
-from bugs26.integration.models import IEFinding, IEReportRecord, IEResult
+from integration import intake, route
+from integration.models import IEFinding, IEReportRecord, IEResult
 
-EX = json.loads((Path(__file__).parent / "fixtures" / "ie_examples.json").read_text(encoding="utf-8"))
+EX = json.loads((Path(__file__).parent / "ie_examples.json").read_text(encoding="utf-8"))
 
 
 def a3():  # "Same as A.2 but with request_id req-003 and the raw_body field removed"

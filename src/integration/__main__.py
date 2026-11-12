@@ -1,7 +1,7 @@
-"""`python -m bugs26.web` - start the server. Access log is off so request lines are never recorded (INT-9)."""
+"""`python -m integration` - start the server. Access log is off so request lines are never recorded (INT-9)."""
 import uvicorn
 
-from .app import app
+from .web import app
 
 
 def main():

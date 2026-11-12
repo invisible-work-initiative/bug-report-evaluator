@@ -7,7 +7,7 @@ It does not judge quality. Finding claims is IE's job, not Integration's.
 import re
 from datetime import datetime, timezone
 
-from ..integration.models import (CRITERIA, IEClaim, IEClaimExtraction, IEDiagnostic, IEEvidence, IEFinding, IELines,
+from integration.models import (CRITERIA, IEClaim, IEClaimExtraction, IEDiagnostic, IEEvidence, IEFinding, IELines,
                                   IEProvenance, IEReportRecord, IEResult, IESection, IEUnevaluatedReason)
 
 PREFIX = "[PLACEHOLDER Input Evaluation] "
@@ -45,7 +45,7 @@ def find_code_references(body: str) -> list[tuple[str, int, int]]:
     return list(found.values())
 
 
-class StubInputEvaluator:
+class PlaceholderInputEvaluator:
     PLACEHOLDER = True
 
     def evaluate(self, record: IEReportRecord) -> IEResult:

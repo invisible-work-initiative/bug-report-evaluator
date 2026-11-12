@@ -10,7 +10,7 @@ The first prototype pulled code references out of the report text inside Integra
 
 ## Decision
 
-Integration structures sections only. It splits the report at headings, keeps the raw text, and records what it could not recognize as diagnostics. IE identifies claims. The prototype no longer extracts code references in Integration. Until IE's implementation exists, a placeholder IE stub does it for demos, and that stub is not part of Integration.
+Integration structures sections only. It splits the report at headings, keeps the raw text, and records what it could not recognize as diagnostics. IE identifies claims. The prototype no longer extracts code references in Integration. Until IE's implementation exists, a placeholder IE does it for demos, and that placeholder is not part of Integration.
 
 ## Alternatives we considered
 
@@ -18,4 +18,4 @@ Keeping extraction in Integration. It duplicates IE's job and could disagree wit
 
 ## Consequences
 
-Integration is simpler and closer to INT-2. The demo depends on the IE stub until IE delivers. Unrecognized headings are not reported to the maintainer as gaps, because IE reads the raw text. They go only to extraction diagnostics.
+Integration is simpler and closer to INT-2. The demo depends on the IE placeholder until IE delivers. Unrecognized headings are not reported to the maintainer as gaps, because IE reads the raw text. They go only to extraction diagnostics.

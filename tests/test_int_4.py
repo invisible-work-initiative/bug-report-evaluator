@@ -2,9 +2,9 @@
 Routing is mechanical: one CI call per identified claim. Also: IE results are checked before anything is routed."""
 import pytest
 
-from bugs26.integration import pipeline
-from bugs26.integration.intake import InputEvaluationError
-from bugs26.integration.models import IEClaimExtraction, IEDiagnostic, IEResult, IEUnevaluatedReason
+from integration import pipeline
+from integration.intake import InputEvaluationError
+from integration.models import IEClaimExtraction, IEDiagnostic, IEResult, IEUnevaluatedReason
 from conftest import ci_result, ie_claim, ie_result
 
 

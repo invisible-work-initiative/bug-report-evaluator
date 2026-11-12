@@ -2,8 +2,8 @@
 import pytest
 from fastapi.testclient import TestClient
 
-from bugs26.integration import github, pipeline
-from bugs26.web.app import app
+from integration import github, pipeline
+from integration.web import app
 from conftest import NAMES, ie_result, sample
 
 client = TestClient(app)
@@ -118,7 +118,7 @@ def test_issue_link_only_for_github_urls(monkeypatch):
 
 def with_evaluator(monkeypatch, evaluator):
     real = pipeline.run
-    monkeypatch.setattr("bugs26.web.app.pipeline.run", lambda *a, **k: real(*a, evaluator=evaluator, **k))
+    monkeypatch.setattr("integration.web.pipeline.run", lambda *a, **k: real(*a, evaluator=evaluator, **k))
 
 
 def test_ie_evidence_lines_link_to_the_original(good, monkeypatch):
@@ -129,7 +129,7 @@ def test_ie_evidence_lines_link_to_the_original(good, monkeypatch):
 
 class PlainIE:
     def evaluate(self, record):
-        from bugs26.integration.models import IELines
+        from integration.models import IELines
         from conftest import ie_evidence
         res = ie_result(record)
         res.criterion_findings[0].evidence[:] = [ie_evidence("x", basis="quotation", source="raw_body",
@@ -147,7 +147,7 @@ def test_ie_failure_is_an_error_page_not_a_500(good, monkeypatch):
 
 
 def test_short_keeps_line_endings_and_adds_dots_only_when_cut():
-    from bugs26.web.app import short
+    from integration.web import short
     assert short("a\r\nb\r\nc") == "a\r\nb\r\nc"          # nothing cut, no dots
     assert short("a\nb\nc\n") == "a\nb\nc\n"
     assert short("a\r\nb\nc\nd") == "a\r\nb\nc\n..."      # 4th line cut, endings kept
@@ -181,7 +181,7 @@ def test_unmapped_sections_are_not_a_maintainer_gap():
 def test_missing_heading_is_not_called_missing_information(good):
     r = client.post("/api/evaluate", data={"text": "## Expected\nok"}).json()
     c2 = r["ie"]["criterion_findings"][1]
-    assert (c2["rating"], c2["evaluation_status"]) == (None, "unevaluated")  # the stub never says M
+    assert (c2["rating"], c2["evaluation_status"]) == (None, "unevaluated")  # the placeholder never says M
     assert all(f["rating"] != "M" for f in r["ie"]["criterion_findings"])
 
 
@@ -198,7 +198,7 @@ def test_missing_or_insufficient_label_for_m(monkeypatch):
 def test_offline_demo_sample_lists_claims_as_not_investigated():
     body = client.post("/api/evaluate", data={"text": sample("issue-form-report.md")}).json()
     assert body["ie"]["processing_status"] == "partial" and len(body["ie"]["identified_claims"]) == 5
-    assert body["ci_results"] == []  # the CI stub invents no outcome
+    assert body["ci_results"] == []  # the CI placeholder invents no outcome
     assert sum("not investigated: NotImplementedError" in c for c in body["could_not_check"]) == 5
     assert [c for c in body["could_not_check"] if c.startswith("C")][:2] == [
         "C6 not evaluated (dependency_unavailable): The placeholder does not judge this criterion.",

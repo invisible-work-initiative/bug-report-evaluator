@@ -7,9 +7,9 @@ import re
 
 from fastapi.testclient import TestClient
 
-from bugs26.integration import pipeline
-from bugs26.integration.models import CIEvidence, CIFinding, CIResult
-from bugs26.web import app as web
+from integration import pipeline
+from integration.models import CIEvidence, CIFinding, CIResult
+from integration import web
 from conftest import sample
 
 
@@ -40,7 +40,7 @@ def run(ci):
 
 
 def page(ci, monkeypatch):
-    """Render the maintainer page with this fake CI in place of the stub."""
+    """Render the maintainer page with this fake CI in place of the placeholder."""
     real = pipeline.run
     monkeypatch.setattr(web.pipeline, "run", lambda *a, **k: real(*a, **{**k, "investigator": ci}))
     r = TestClient(web.app).post("/evaluate", data={"text": sample("good-report.md")})

@@ -1,5 +1,5 @@
 """INT-5 Verification: check that Integration receives findings from both subsystems."""
-from bugs26.integration import pipeline
+from integration import pipeline
 from conftest import ci_result, ie_claim, ie_result
 
 

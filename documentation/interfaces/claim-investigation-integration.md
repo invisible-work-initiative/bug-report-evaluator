@@ -22,8 +22,8 @@ Integration sends CI one investigation request per claim that Input Evaluation (
 
 - CI draft 0.2 (above), sections 4 (items) and 6 (CI-IN-01 to CI-IN-06).
 - [Input Evaluation - Integration agreement](input-evaluation-integration.md): IE's claims (`IEClaim`) and the routing inputs.
-- [Integration requirements](../subsystems/integration/requirements.md): INT-4, INT-5, INT-7, INT-8, INT-9. [Verification](../subsystems/integration/verification.md).
-- Code: the classes named `CI...` in `src/bugs26/integration/models.py` follow the CI draft (`CIResult`, `CIFinding`, `CIEvidence`); `CIRequest` is Integration's proposal. `interfaces.py` has the `ClaimInvestigator` Protocol. `stubs/claim_investigation_stub.py` is a placeholder.
+- [Integration requirements](../requirements/integration.md): INT-4, INT-5, INT-7, INT-8, INT-9. [Verification](../requirements/integration-verification.md).
+- Code: the classes named `CI...` in `src/integration/models.py` follow the CI draft (`CIResult`, `CIFinding`, `CIEvidence`); `CIRequest` is Integration's proposal. `interfaces.py` has the `ClaimInvestigator` Protocol. `src/claim_investigation/placeholder.py` is a placeholder.
 
 ## 3 Routing rule
 
@@ -103,7 +103,7 @@ CI's CI-IN-01 to CI-IN-06. Integration's part is CI-IN-02 (claim id kept), CI-IN
 
 | CI requirement | Method | Test | Status |
 |---|---|---|---|
-| CI-IN-01 | Test | `tests/test_int_4.py::test_one_ci_call_per_claim`, `test_ci_receives_request_with_context` | Pass (stub) |
+| CI-IN-01 | Test | `tests/test_int_4.py::test_one_ci_call_per_claim`, `test_ci_receives_request_with_context` | Pass (placeholder) |
 | CI-IN-02 | Test | `tests/test_int_4.py::test_ci_answer_for_another_claim_or_request_is_a_failure_not_a_result`, `tests/test_int_7.py::test_everything_links_to_its_report` | Pass |
 | CI-IN-03 | Inspection | CI's evidence is shown as sent: `tests/test_int_8.py::test_ie_and_ci_results_pass_through_unchanged` | Pass (fakes) |
 | CI-IN-04 | Test | `tests/test_int_4.py::test_ci_limit_and_insufficient_evidence_reach_could_not_check` | Pass (fakes) |

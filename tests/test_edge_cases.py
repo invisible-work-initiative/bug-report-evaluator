@@ -1,9 +1,9 @@
 """Iteration 9 review fixes: R4 diagnostics, lenient-where-the-draft-is-silent IE checks, CI validation, blank values."""
 import pytest
 
-from bugs26.integration import intake, pipeline
-from bugs26.integration.intake import InputEvaluationError
-from bugs26.integration.models import IEClaimExtraction, IEDiagnostic, IELines, IEUnevaluatedReason
+from integration import intake, pipeline
+from integration.intake import InputEvaluationError
+from integration.models import IEClaimExtraction, IEDiagnostic, IELines, IEUnevaluatedReason
 from conftest import ci_result, ie_claim, ie_result
 
 
@@ -134,7 +134,7 @@ def test_blank_value_leaves_out_its_final_line_break_and_lies_inside_its_lines()
     assert (s.sections[0].value, s.sections[0].source_lines.end) == ("", 1)  # empty blank mid-body: the heading line only
 
 
-def test_stub_messages_do_not_repeat_the_criterion_id():
+def test_placeholder_messages_do_not_repeat_the_criterion_id():
     out = pipeline.run("## Steps\nx", "paste")
     msgs = [f.unevaluated_reason.message for f in out.ie.criterion_findings if f.unevaluated_reason]
     assert msgs and not any(m.startswith("C") and m[1].isdigit() for m in msgs)

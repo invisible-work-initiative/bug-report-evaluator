@@ -1,8 +1,8 @@
 """INT-6 Verification: output includes the collected findings and reaches the maintainer-facing interface."""
 from fastapi.testclient import TestClient
 
-from bugs26.integration import pipeline
-from bugs26.web.app import app
+from integration import pipeline
+from integration.web import app
 from conftest import ci_result
 
 
@@ -20,7 +20,7 @@ def test_output_includes_collected_findings_and_r4(good):
     assert any("insufficient evidence; file not found" in c for c in out.could_not_check)
 
 
-def test_stubs_are_labelled_and_claims_are_listed_as_not_investigated(good):
+def test_placeholders_are_labelled_and_claims_are_listed_as_not_investigated(good):
     out = pipeline.run(good, "paste")
     assert out.placeholders == ["Input Evaluation", "Claim Investigation"] and out.ci_results == []
     assert sum("not investigated: NotImplementedError: Claim Investigation not connected" in c for c in out.could_not_check) == 3

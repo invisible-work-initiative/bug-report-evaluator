@@ -7,9 +7,9 @@ from fastapi.responses import JSONResponse
 from fastapi.templating import Jinja2Templates
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
-from ..integration import github, pipeline
-from ..integration.intake import InputEvaluationError
-from ..integration.models import CRITERIA
+from . import github, pipeline
+from .intake import InputEvaluationError
+from .models import CRITERIA
 
 MAX_BYTES = 200 * 1024        # one report
 MAX_REQUEST = 256 * 1024      # whole request (Content-Length)

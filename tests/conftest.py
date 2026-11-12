@@ -2,7 +2,7 @@ from pathlib import Path
 
 import pytest
 
-from bugs26.integration.models import (CIFinding, CIResult, IEClaim, IEClaimExtraction, IEEvidence, IEFinding,
+from integration.models import (CIFinding, CIResult, IEClaim, IEClaimExtraction, IEEvidence, IEFinding,
                                        IELines, IEProvenance, IEResult)
 
 SAMPLES = Path(__file__).resolve().parent.parent / "samples"
@@ -49,7 +49,7 @@ def good():
 @pytest.fixture(autouse=True)
 def supported_repo_o_r(tmp_path, monkeypatch):
     """Tests use the repo o/r; the real supported_repos.txt is tested separately."""
-    from bugs26.integration import github
+    from integration import github
     f = tmp_path / "supported_repos.txt"
     f.write_text("# test list\no/r\n", encoding="utf-8")
     monkeypatch.setattr(github, "SUPPORTED_FILE", f)

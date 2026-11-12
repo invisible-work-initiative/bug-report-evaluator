@@ -1,6 +1,6 @@
 """INT-3 Verification: check that Input Evaluation receives both versions of the report."""
-from bugs26.integration import pipeline
-from bugs26.integration.models import IEReportRecord
+from integration import pipeline
+from integration.models import IEReportRecord
 from conftest import ie_result
 
 
@@ -36,9 +36,9 @@ def test_github_metadata_is_sent():
         "o/r", 7, "https://github.com/o/r/issues/7", "T", ["bug"], "2026-11-01T14:00:00Z")
 
 
-def test_stub_ie_finds_code_references_not_integration():
-    from bugs26.integration import intake
-    from bugs26.stubs.input_evaluation_stub import find_code_references
+def test_placeholder_ie_finds_code_references_not_integration():
+    from integration import intake
+    from input_evaluation.placeholder import find_code_references
     assert not hasattr(intake.structure(intake.receive("x", "paste")), "code_references")
     body = "`NaN` `float` `3.11` `df.dropna()` `a_b` `src/x.py` see https://github.com/o/r/blob/m/a/b.py and c.js:4 and f()"
     assert [t for t, _, _ in find_code_references(body)] == ["df.dropna()", "a_b", "src/x.py", "c.js:4", "f()"]

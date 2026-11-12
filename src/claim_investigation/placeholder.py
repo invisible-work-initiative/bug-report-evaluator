@@ -1,9 +1,9 @@
 """PLACEHOLDER Claim Investigation. The real CI subsystem (another team) replaces this.
 It invents no outcome: every call fails, so Integration lists each claim as not investigated."""
-from ..integration.models import CIRequest, CIResult
+from integration.models import CIRequest, CIResult
 
 
-class StubClaimInvestigator:
+class PlaceholderClaimInvestigator:
     PLACEHOLDER = True
 
     def investigate(self, request: CIRequest) -> CIResult:

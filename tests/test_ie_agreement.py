@@ -12,14 +12,14 @@ from pathlib import Path
 import pytest
 from fastapi.testclient import TestClient
 
-from bugs26.integration import github, intake, pipeline, route
-from bugs26.integration.intake import InputEvaluationError
-from bugs26.integration.models import (CRITERIA, CIRequest, IEClaim, IEClaimExtraction, IEDiagnostic, IEEvidence,
+from integration import github, intake, pipeline, route
+from integration.intake import InputEvaluationError
+from integration.models import (CRITERIA, CIRequest, IEClaim, IEClaimExtraction, IEDiagnostic, IEEvidence,
                                        IELines, IEResult)
-from bugs26.web.app import app
+from integration.web import app
 from conftest import NAMES, ci_result, ie_result, sample
 
-EX = json.loads((Path(__file__).parent / "fixtures" / "ie_examples.json").read_text(encoding="utf-8"))
+EX = json.loads((Path(__file__).parent / "ie_examples.json").read_text(encoding="utf-8"))
 ISSUE_URL = "https://github.com/o/r/issues/7"  # conftest makes o/r the supported repo
 CONCEPTS = {"bug_description", "steps_to_reproduce", "expected_behavior", "observed_behavior", "environment_version",
             "supporting_evidence"}
@@ -246,7 +246,7 @@ def test_IF_3_absent_is_never_emitted(body):
 
 def with_ie(monkeypatch, evaluator):
     real = pipeline.run
-    monkeypatch.setattr("bugs26.web.app.pipeline.run", lambda *a, **k: real(*a, evaluator=evaluator, **k))
+    monkeypatch.setattr("integration.web.pipeline.run", lambda *a, **k: real(*a, evaluator=evaluator, **k))
 
 
 def a4_for(record):
@@ -673,10 +673,10 @@ def test_IF_12_three_reports_from_one_reporter_leave_no_identity_or_link(monkeyp
         assert needle not in json.dumps(api).lower() and not FORBIDDEN_KEYS & set(all_keys(api))
     assert needle not in caplog.text.lower()
     for name, mod in list(sys.modules.items()):  # module-level state of our own code (and the test's helpers)
-        if name.startswith("bugs26"):
+        if name.split(".")[0] in ("integration", "input_evaluation", "claim_investigation", "conftest"):
             assert not scan(vars(mod), needle), f"{LOGIN} found in module state of {name}"
     # no model has an identity field
-    models = [m for n, m in sys.modules.items() if n == "bugs26.integration.models"]
+    models = [m for n, m in sys.modules.items() if n == "integration.models"]
     for cls in vars(models[0]).values():
         if isinstance(cls, type) and hasattr(cls, "model_fields"):
             assert not FORBIDDEN_KEYS & set(cls.model_fields), cls.__name__

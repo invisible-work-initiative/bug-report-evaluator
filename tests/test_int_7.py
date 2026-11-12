@@ -1,5 +1,5 @@
 """INT-7 Verification: each finding, claim, and evidence item is linked to the correct report (by request_id)."""
-from bugs26.integration import pipeline
+from integration import pipeline
 from conftest import ci_result, sample
 
 

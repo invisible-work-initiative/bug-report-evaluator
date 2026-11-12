@@ -215,7 +215,7 @@ class CIResult(CIModel):
 
 class MaintainerOutput(BaseModel):
     """record (the snapshot, IE 4.3), ie, ci_requests (as sent) and ci_results are exactly what crossed each interface
-    (INT-8). could_not_check is always present (R4). placeholders names the subsystems that are stubs."""
+    (INT-8). could_not_check is always present (R4). placeholders names the subsystems that are placeholders."""
     sha256: str
     source: str
     placeholders: list[str] = Field(default_factory=list)

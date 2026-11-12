@@ -10,7 +10,7 @@ INT-1 says Integration receives bug reports from "supported GitHub repositories"
 
 ## Decision
 
-The supported repositories are an allowlist in `src/bugs26/integration/supported_repos.txt`, one `owner/repo` per line, case-insensitive. It is seeded with 8 test repositories. Adding one means adding a line and restarting the server. A report from any other repository gets the message "This repository is not supported yet".
+The supported repositories are an allowlist in `src/integration/supported_repos.txt`, one `owner/repo` per line, case-insensitive. It is seeded with 8 test repositories. Adding one means adding a line and restarting the server. A report from any other repository gets the message "This repository is not supported yet".
 
 ## Alternatives we considered
 
