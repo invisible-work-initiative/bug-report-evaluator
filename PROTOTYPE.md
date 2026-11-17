@@ -8,7 +8,7 @@ No database, no LLM. The only network call is the optional GitHub issue fetch (s
 
 ## Layout
 
-One folder per subsystem in `src/`. Each subsystem team owns its folder.
+One folder per subsystem in `src/`. Each subsystem team owns its folder and puts its code there; each folder's README says how to connect.
 
 ```
 src/
@@ -26,6 +26,7 @@ src/
     placeholder.py      stands in for Input Evaluation until that team's code arrives
   claim_investigation/
     placeholder.py      stands in for Claim Investigation; investigates nothing
+  software_systems/     Software Systems; empty until that team adds code
 tests/                  test_int_N.py checks requirement INT-N; *_agreement.py check the interface agreements
 samples/                example bug reports to try by hand and used by the tests
 ```
