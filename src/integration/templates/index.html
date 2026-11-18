@@ -1,0 +1,80 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><title>Bug report evaluator</title>
+<style>
+html{color-scheme:light}
+body{font:16px/1.5 system-ui,sans-serif;max-width:40rem;margin:2.5rem auto;padding:0 1.25rem;color:#1c1c1c;background:#f7f6f3}
+h1{font-size:1.6rem;line-height:1.25;margin:0 0 .4rem}
+.lede{margin:0 0 1.25rem;color:#444}
+.note{background:#fff;border:1px solid #e6e2d8;border-radius:8px;padding:.7rem .9rem;margin:0 0 1.25rem}
+.tab-input{position:absolute;opacity:0;pointer-events:none}
+.tabbar{display:inline-flex;gap:2px;background:#ebe8e1;border-radius:8px;padding:3px;margin:0 0 1rem}
+.tabbar label{padding:.4rem .85rem;border-radius:6px;cursor:pointer;color:#444}
+.panel{display:none;border:0;margin:0;padding:0}
+label.field{display:block;font-weight:600;margin-bottom:.35rem}
+.hint{font-weight:400;color:#555}
+textarea,input[type=text],input[type=file]{font:15px/1.4 ui-monospace,monospace;width:100%;box-sizing:border-box}
+textarea{height:16rem;padding:.7rem;border:1px solid #ccc;border-radius:8px;background:#fff}
+input[type=text]{padding:.55rem .7rem;border:1px solid #ccc;border-radius:8px;background:#fff;font-family:system-ui,sans-serif}
+.samples{display:flex;flex-wrap:wrap;gap:.45rem;margin:.8rem 0 0}
+.samples button{font:14px system-ui,sans-serif;background:#fff;border:1px solid #ccc;border-radius:999px;padding:.35rem .75rem;cursor:pointer}
+.samples button:hover{border-color:#1c1c1c}
+.repo{margin:1rem 0}
+button[type=submit]{font:16px system-ui,sans-serif;background:#1c1c1c;color:#fff;border:0;border-radius:8px;padding:.55rem 1.1rem;cursor:pointer}
+#tab-paste:checked ~ form .paste,#tab-file:checked ~ form .upload,#tab-github:checked ~ form .github{display:block}
+#tab-github:checked ~ form .repo{display:none}
+#tab-paste:checked ~ form label[for=tab-paste],#tab-file:checked ~ form label[for=tab-file],#tab-github:checked ~ form label[for=tab-github]{background:#fff;color:#1c1c1c;font-weight:600}
+</style></head>
+<body>
+<h1>Check a bug report</h1>
+<p class="lede">See whether a report has the parts a maintainer needs, and which lines those parts are on.</p>
+<p class="note">This is a preview. Reports stay in memory and are not saved. The scores are a sketch, not a finished review.</p>
+<input class="tab-input" type="radio" name="tab" id="tab-paste" checked>
+<input class="tab-input" type="radio" name="tab" id="tab-file">
+<input class="tab-input" type="radio" name="tab" id="tab-github">
+<form method="post" action="/evaluate" enctype="multipart/form-data">
+<div class="tabbar">
+<label for="tab-paste">Paste text</label>
+<label for="tab-file">Upload a file</label>
+<label for="tab-github">GitHub link</label>
+</div>
+<fieldset class="panel paste">
+<label class="field" for="report-text">The report <span class="hint">Markdown or plain text</span></label>
+<textarea id="report-text" name="text" placeholder="Paste the bug report here"></textarea>
+<p class="hint">Or start from an example</p>
+<p class="samples">
+<button type="button" data-sample="good-report.md">Complete report</button>
+<button type="button" data-sample="issue-form-report.md">Issue form</button>
+<button type="button" data-sample="cites-nonexistent-file.md">Cites a file</button>
+<button type="button" data-sample="missing-steps.md">Missing steps</button>
+</p>
+</fieldset>
+<fieldset class="panel upload">
+<label class="field">A .md or .txt file <span class="hint">Up to 200 KB</span><br><input type="file" name="file" accept=".md,.txt"></label>
+</fieldset>
+<fieldset class="panel github">
+<label class="field">Issue link<br><input type="text" name="issue_url" placeholder="https://github.com/owner/repo/issues/123"></label>
+</fieldset>
+<p class="repo"><label class="field">Repository link <span class="hint">Optional. Only for pasted or uploaded reports.</span><br><input type="text" name="repo_url" placeholder="https://github.com/owner/repo"></label></p>
+<p><button type="submit">Check this report</button></p>
+</form>
+<script>
+const form = document.querySelector("form");
+form.addEventListener("submit", () => {
+  const paste = document.getElementById("tab-paste").checked;
+  const upload = document.getElementById("tab-file").checked;
+  form.elements.text.disabled = !paste;
+  form.elements.file.disabled = !upload;
+  form.elements.issue_url.disabled = !document.getElementById("tab-github").checked;
+  form.elements.repo_url.disabled = !paste && !upload;
+});
+document.querySelectorAll("[data-sample]").forEach(button => {
+  button.addEventListener("click", async () => {
+    const response = await fetch("/samples/" + button.dataset.sample);
+    if (!response.ok) return;
+    document.getElementById("tab-paste").checked = true;
+    form.elements.text.value = await response.text();
+    form.elements.text.focus();
+  });
+});
+</script>
+</body></html>

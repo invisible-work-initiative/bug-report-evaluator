@@ -1,0 +1,10 @@
+# Repositories Integration accepts reports from (INT-1). One owner/repo per line, case-insensitive.
+# To add one: append a line and restart the server.
+psf/requests
+pandas-dev/pandas
+kubernetes/kubernetes
+grafana/grafana
+obsproject/obs-studio
+ansible/ansible
+docker/compose
+ollama/ollama
