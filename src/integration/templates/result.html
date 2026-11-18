@@ -1,14 +1,58 @@
 <!doctype html>
-<html lang="en"><head><meta charset="utf-8"><title>Evaluation result</title>
-<style>body{font:16px sans-serif;max-width:60rem;margin:2rem auto;padding:0 1rem}
-table{border-collapse:collapse;width:100%}td,th{border:1px solid #ccc;padding:.4rem;vertical-align:top;text-align:left}
-pre{white-space:pre-wrap;margin:.2rem 0;background:#f4f4f4;padding:.3rem}
+<html lang="en"><head><meta charset="utf-8"><title>Report check</title>
+<style>
+html{color-scheme:light}
+body{font:16px/1.5 system-ui,sans-serif;max-width:76rem;margin:1.25rem auto 3rem;padding:0 1.25rem;color:#1c1c1c;background:#f7f6f3}
+a{color:#1a4f8b}
+h2{font-size:1.15rem;margin:1.4rem 0 .4rem}
+h3{font-size:1rem;margin:.8rem 0 .3rem}
+.back{margin:0 0 .8rem}
+.layout{display:flex;gap:1.25rem;align-items:flex-start}
+.findings{flex:1 1 auto;min-width:0}
+.source{flex:0 0 18rem;width:18rem}
+.card{background:#fff;border:1px solid #e6e2d8;border-radius:10px;padding:1rem 1.1rem}
+.source{position:sticky;top:1rem;max-height:calc(100vh - 2rem);overflow:auto;padding:.75rem .7rem}
+.source h2{margin-top:0;font-size:1rem}
+table{border-collapse:collapse;width:100%}
+td,th{border-bottom:1px solid #eee;padding:.55rem .4rem;vertical-align:top;text-align:left}
+th{font-size:.85rem;color:#555;font-weight:600}
+pre{white-space:pre-wrap;margin:.35rem 0;background:#f6f5f2;padding:.45rem .55rem;border-radius:6px;font:13px/1.4 ui-monospace,monospace}
 .P,.supported{color:#176b2c}.M,.contradicted{color:#a12020}.U,.insufficient,.NE{color:#8a6100}
-.cnc{background:#fff4d6;padding:.5rem 1rem;border-left:4px solid #e0a800}
-.banner{padding:.6rem 1rem;border-left:6px solid #555;background:#eee;font-weight:bold}
-.completed{border-color:#176b2c}.partial{border-color:#e0a800}.invalid_input,.failed{border-color:#a12020}
-.orig td{border:0;padding:0 .5rem;font:13px monospace;white-space:pre-wrap}.orig td:first-child{color:#888;text-align:right}
-.span{color:#666;font-size:.85em}</style></head>
+.note{background:#fff8e8;border:1px solid #f0e2b8;border-radius:8px;padding:.7rem .9rem}
+.banner{padding:.7rem .9rem;border-radius:8px;background:#f3f1ec;margin:.8rem 0}
+.completed{background:#eef6ef}.partial{background:#fff8e8}.invalid_input,.failed{background:#fdecec}
+.orig td{border:0;padding:.05rem .45rem;font:13px/1.45 ui-monospace,monospace;white-space:pre-wrap}
+.orig td:first-child{color:#999;text-align:right;width:2.4rem}
+.orig tr:target td{background:#fff3c4}
+.muted{color:#5c5c5c;font-size:.92rem}
+.pair{display:grid;grid-template-columns:1fr 1fr;gap:.75rem;margin:.8rem 0}
+.box{background:#f7f6f3;border-radius:8px;padding:.7rem .85rem}
+.box h3{margin:0 0 .35rem}
+.strip{display:flex;flex-wrap:wrap;gap:.4rem;margin:.3rem 0 .2rem}
+.chip{background:#f3f1ec;border-radius:999px;padding:.2rem .7rem;font-size:.85rem}
+.chip a{color:inherit;text-decoration:none}
+.chip.unrecognized{background:#fff;border:1px dashed #ccc}
+.sr{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);border:0}
+.more{margin-top:1.5rem}
+.more summary{cursor:pointer;color:#444}
+.handoffs{display:grid;gap:.75rem}
+.handoff{background:#fff;border:1px solid #e6e2d8;border-radius:10px;padding:.85rem 1rem}
+.handoff h3{margin:0}
+.kv{display:grid;grid-template-columns:7.5rem 1fr;gap:.15rem .75rem;margin:.55rem 0 .2rem}
+.kv dt{color:#5c5c5c;font-size:.85rem}
+.kv dd{margin:0}
+.sec-list{list-style:none;padding:0;margin:.35rem 0 .2rem}
+.sec-list li{padding:.4rem 0;border-top:1px solid #eee}
+.sec-list p{margin:.15rem 0 0;white-space:pre-wrap}
+.ask{padding:.55rem 0;border-top:1px solid #eee}
+.ask p{margin:.2rem 0}
+.json{margin-top:.35rem}
+.json summary{font-size:.85rem;color:#555}
+.json pre{max-height:14rem;overflow:auto}
+@media (max-width:900px){
+.layout{flex-direction:column}.source{position:static;width:auto;flex:none;max-height:14rem;order:-1}.pair,.kv{grid-template-columns:1fr}
+}
+</style></head>
 <body>
 {% set RATINGS = {"P": "Present", "M": "Missing or insufficient", "N/A": "Not applicable", "U": "Unclear"} %}
 {% set STATUS = {"completed": "Evaluation completed", "partial": "Partial evaluation: some parts could not be done (see Could not check)",
@@ -17,48 +61,123 @@ pre{white-space:pre-wrap;margin:.2rem 0;background:#f4f4f4;padding:.3rem}
 {% macro where(e) %}{% if e.lines %}<a href="#L{{ e.lines.start }}">{% if e.lines.start == e.lines.end %}line {{ e.lines.start }}{% else %}lines {{ e.lines.start }}&ndash;{{ e.lines.end }}{% endif %}</a>{% elif e.source == "title" %}title{% else %}whole report{% endif %}{% endmacro %}
 {% set ie = output.ie %}{% set failed = ie.processing_status in ["invalid_input", "failed"] %}{% set rec = output.record %}
 {% set ci = {} %}{% for r in output.ci_results %}{% set _ = ci.update({r.claim_id: r}) %}{% endfor %}
-<p><a href="/">&larr; Evaluate another report</a></p>
-<h2>{{ rec.title or "Bug report" }}</h2>
-{% if issue_link %}<p><a href="{{ issue_link }}">{{ issue_link }}</a></p>{% endif %}
-{% if output.placeholders %}<p class="cnc">{{ output.placeholders | join(" and ") }} {{ "is a placeholder" if output.placeholders | length == 1 else "are placeholders" }}: the results below are not real evaluations.</p>{% endif %}
-{% if output.source != "github" %}<p>Source: {{ "pasted" if output.source == "paste" else "uploaded" }} report (outside the current IE agreement, decision 0006).</p>{% endif %}
+{% set exp = section_by_concept(rec, "expected_behavior") %}{% set obs = section_by_concept(rec, "observed_behavior") %}
+{% set limits = split_limits(output.could_not_check) %}{% set gaps = gap_lines(output) %}{% set env = environment_line(rec) %}
+<p class="back"><a href="/">Check another report</a></p>
+<div class="layout">
+<div class="findings card">
+<h2>{{ display_title(rec) }}</h2>
+{% if issue_link %}<p><a href="{{ issue_link }}">Open the GitHub issue</a></p>{% endif %}
+{% if env %}<p class="muted">{{ env }}</p>{% endif %}
+{% if output.placeholders %}<p class="note">This preview is not a finished review. {{ output.placeholders | join(" and ") }} {{ "is a placeholder" if output.placeholders | length == 1 else "are placeholders" }}.</p>{% endif %}
+{% if output.source != "github" %}<p class="muted">{{ "Pasted text" if output.source == "paste" else "Uploaded file" }}<span class="sr">outside the current IE agreement, decision 0006</span></p>{% endif %}
 <div class="banner {{ ie.processing_status }}">{{ STATUS[ie.processing_status] }}</div>
-<h2>Summary</h2>
+{% if gaps %}<div class="note"><p><strong>Still needed</strong></p><ul>{% for line in gaps %}<li>{{ line }}</li>{% endfor %}</ul></div>{% endif %}
+<div class="pair">
+<div class="box"><h3>Expected</h3>{% if exp %}<p>{{ exp.value | short }}</p>{% if exp.source_lines %}<p><a href="#L{{ exp.source_lines.start }}">line {{ exp.source_lines.start }}</a></p>{% endif %}{% else %}<p class="muted">Not in the report.</p>{% endif %}</div>
+<div class="box"><h3>What happened</h3>{% if obs %}<p>{{ obs.value | short }}</p>{% if obs.source_lines %}<p><a href="#L{{ obs.source_lines.start }}">line {{ obs.source_lines.start }}</a></p>{% endif %}{% else %}<p class="muted">Not in the report.</p>{% endif %}<p class="sr">Observed</p></div>
+</div>
+{% set sections = body_sections(rec) %}
+{% if sections %}<p class="muted">Jump to a part of the report</p><p class="strip">{% for s in sections %}<span class="chip {{ s.recognition }}">{% if s.source_lines %}<a href="#L{{ s.source_lines.start }}">{{ s.original_label }}</a>{% else %}{{ s.original_label }}{% endif %}{% if s.recognition == "unrecognized" %} · Kept{% endif %}</span>{% endfor %}</p>{% endif %}
+<details>
+<summary>Counts</summary>
 {% if failed %}<p>No criterion was evaluated; claims were not extracted.</p>{% else %}<ul>
 <li>Criteria: {% for r, label in RATINGS.items() %}{{ label }} {{ ie.criterion_findings | selectattr("rating", "equalto", r) | list | length }}, {% endfor %}not evaluated {{ ie.unevaluated_criteria | length }}</li>
 <li>Claims: {{ ie.identified_claims | length }} identified, {{ output.ci_results | length }} investigated</li>
 </ul>{% endif %}
+</details>
 <h2>Input Evaluation</h2>
-{% if failed %}<p>No criterion was evaluated.</p>{% else %}<table><tr><th>Criterion</th><th>Rating</th><th>Explanation</th><th>Evidence</th></tr>
-{% for f in ie.criterion_findings %}<tr><td>{{ f.criterion_id }} {{ CRITERIA[f.criterion_id] }}</td>
+<p class="muted">Which usual parts of a bug report are present.</p>
+{% if failed %}<p>No criterion was evaluated.</p>{% else %}
+<table><tr><th>Criterion</th><th>Rating</th><th>Explanation</th><th>Evidence</th></tr>
+{% for f in ie.criterion_findings if f.rating %}<tr><td>{{ f.criterion_id }} {{ CRITERIA[f.criterion_id] }}</td>
 <td class="{{ f.rating or 'NE' }}">{{ RATINGS[f.rating] if f.rating else "Not evaluated" }}{% if f.rating %} ({{ f.rating }}){% elif f.unevaluated_reason %} ({{ f.unevaluated_reason.code }}){% endif %}</td><td>{{ f.explanation }}</td>
-<td>{% for e in f.evidence %}<div>{{ e.basis }}, {{ where(e) }}{% if e.quote %}<pre>{{ e.quote | short }}</pre>{% endif %}<div class="span">{{ e.explanation }}</div></div>{% endfor %}</td></tr>
-{% endfor %}</table>{% endif %}
+<td>{% for e in f.evidence %}<div>{{ e.basis }}, {{ where(e) }}{% if e.quote %}<pre>{{ e.quote | short }}</pre>{% endif %}<div class="muted">{{ e.explanation }}</div></div>{% endfor %}</td></tr>
+{% endfor %}</table>
+{% set unevaluated = ie.criterion_findings | rejectattr("rating") | list %}
+{% if unevaluated %}<details><summary>Not evaluated ({{ unevaluated | length }})</summary>
+<table><tr><th>Criterion</th><th>Rating</th><th>Explanation</th><th>Evidence</th></tr>
+{% for f in unevaluated %}<tr><td>{{ f.criterion_id }} {{ CRITERIA[f.criterion_id] }}</td>
+<td class="NE">Not evaluated{% if f.unevaluated_reason %} ({{ f.unevaluated_reason.code }}){% endif %}</td><td>{{ f.explanation }}</td>
+<td>{% for e in f.evidence %}<div>{{ e.basis }}, {{ where(e) }}{% if e.quote %}<pre>{{ e.quote | short }}</pre>{% endif %}<div class="muted">{{ e.explanation }}</div></div>{% endfor %}</td></tr>
+{% endfor %}</table></details>{% endif %}
+{% endif %}
 {% if ie.diagnostics %}<p>Input Evaluation diagnostics:</p><ul>{% for d in ie.diagnostics %}<li>{{ d.severity }}: {{ d.code }}: {{ d.message }}</li>{% endfor %}</ul>{% endif %}
 <h2>Claims</h2>
+<p class="muted">Names and files mentioned in the report. Each row stays with its own Claim Investigation result.</p>
 {% if failed %}<p>Claims were not extracted.</p>{% elif ie.identified_claims %}
-<table><tr><th>Claim</th><th>Where</th><th>Claim Investigation</th><th>Explanation</th><th>Evidence</th></tr>
+{% set kinds = {"file": "File and line", "call": "Function call", "other": "Other reference"} %}
+<table><tr><th>Claim</th><th>Kind</th><th>Where</th><th>Claim Investigation</th><th>Explanation</th><th>Evidence</th></tr>
 {% for c in ie.identified_claims %}{% set r = ci.get(c.claim_id) %}{% set f = r.findings[0] if r else none %}<tr>
-<td><code>{{ c.claim_text }}</code></td><td>{{ where(c.source) }}</td>
-{% if f %}<td class="{{ f.outcome.split()[0] }}">{{ OUTCOMES[f.outcome] }}{% if r.limitation %}<div class="span">{{ r.limitation }}</div>{% endif %}</td><td>{{ f.explanation }}</td>
-<td>{% for e in f.evidence %}<div>{{ e.type }}: {{ e.reference }}<div class="span">{{ e.explanation }}</div></div>{% endfor %}</td>
+<td><code>{{ c.claim_text }}</code></td><td>{{ kinds[claim_kind(c.claim_text)] }}</td><td>{{ where(c.source) }}</td>
+{% if f %}<td class="{{ f.outcome.split()[0] }}">{{ OUTCOMES[f.outcome] }}{% if r.limitation %}<div class="muted">{{ r.limitation }}</div>{% endif %}</td><td>{{ f.explanation }}</td>
+<td>{% for e in f.evidence %}<div>{{ e.type }}: {{ e.reference }}<div class="muted">{{ e.explanation }}</div></div>{% endfor %}</td>
 {% else %}<td colspan="3">Not investigated (see Could not check)</td>{% endif %}</tr>
 {% endfor %}</table>
 {% else %}<p>No claims were identified.</p>{% endif %}
 <h2>Could not check</h2>
-<div class="cnc"><ul>{% for item in output.could_not_check %}<li>{{ item }}</li>{% endfor %}</ul></div>
+{% if limits.report %}<h3>In this report</h3><div class="note"><ul>{% for item in limits.report %}<li>{{ item }}</li>{% endfor %}</ul></div>{% endif %}
+{% if limits.pending %}<h3>Not checked yet</h3><p class="muted">These checks are not connected in this preview.</p><div class="note"><ul>{% for item in limits.pending %}<li>{{ item }}</li>{% endfor %}</ul></div>{% endif %}
+{% if not limits.report and not limits.pending %}<div class="note"><p>Nothing was left unchecked.</p></div>{% endif %}
+</div>
+<div class="source card">
 <h2>Original report</h2>
+<p class="muted">Line numbers match the links.</p>
 <table class="orig">{% for line in rec.raw_body.split("\n") %}<tr id="L{{ loop.index }}"><td>{{ loop.index }}</td><td>{{ line.rstrip("\r") }}</td></tr>{% endfor %}</table>
+</div>
+</div>
+<div class="more">
 <p><a href="data:application/json;charset=utf-8,{{ output.model_dump_json(indent=2) | urlencode }}" download="evaluation-{{ rec.request_id }}.json"><button type="button">Download JSON</button></a></p>
 <h2>Subsystem handoffs</h2>
-<details><summary>Integration → Input Evaluation: exact input JSON</summary><pre>{{ rec.model_dump_json(indent=2) }}</pre></details>
-<details><summary>Input Evaluation → Integration: response JSON</summary><pre>{{ ie.model_dump_json(indent=2) }}</pre></details>
-<details><summary>Integration → Claim Investigation: requests sent, one per claim</summary>
-{% for item in output.ci_requests %}<h3>Claim {{ loop.index }}</h3><pre>{{ item.model_dump_json(indent=2) }}</pre>{% else %}<p>No CI request.</p>{% endfor %}</details>
-<details><summary>Claim Investigation → Integration: responses received</summary>
-{% for item in output.ci_results %}<pre>{{ item.model_dump_json(indent=2) }}</pre>{% else %}<p>No Claim Investigation response was received.</p>{% endfor %}</details>
+<p class="muted">What each subsystem sent and got back. The report text is not repeated here.</p>
+<div class="handoffs">
+<article class="handoff">
+<h3>Integration → Input Evaluation</h3>
+<p class="muted">The report that was sent in.</p>
+<dl class="kv">
+<dt>Title</dt><dd>{{ rec.title or display_title(rec) }}</dd>
+{% if rec.repository %}<dt>Repository</dt><dd>{{ rec.repository }}{% if rec.issue_number %} #{{ rec.issue_number }}{% endif %}</dd>{% endif %}
+<dt>Reading</dt><dd>{{ rec.extraction.mode | replace("_", " ") }}, {{ rec.sections | length }} section{{ "" if rec.sections | length == 1 else "s" }}</dd>
+{% if rec.labels %}<dt>Labels</dt><dd>{{ rec.labels | join(", ") }}</dd>{% endif %}
+</dl>
+{% if body_sections(rec) %}<ul class="sec-list">{% for s in body_sections(rec) %}<li><strong>{{ s.original_label }}</strong> <span class="muted">{{ s.status }}{% if s.semantic_concept %} · {{ s.semantic_concept | replace("_", " ") }}{% elif s.recognition == "unrecognized" %} · kept{% endif %}</span>{% if s.value %}<p>{{ s.value | short }}</p>{% endif %}</li>{% endfor %}</ul>
+{% else %}<p class="muted">No sections were found. The whole text was sent as one report.</p>{% endif %}
+<details class="json"><summary>Exact input JSON</summary><pre>{{ rec.model_dump_json(indent=2) }}</pre></details>
+</article>
+<article class="handoff">
+<h3>Input Evaluation → Integration</h3>
+<p class="muted">Ratings and claims that came back.</p>
+<dl class="kv">
+<dt>Status</dt><dd>{{ {"completed": "Completed", "partial": "Partial", "invalid_input": "Rejected", "failed": "Failed"}[ie.processing_status] }}</dd>
+<dt>Claims</dt><dd>{{ ie.identified_claims | length }} identified, extraction {{ ie.claim_extraction.status | replace("_", " ") }}</dd>
+</dl>
+{% if not failed %}<ul class="sec-list">{% for f in ie.criterion_findings %}<li><strong>{{ f.criterion_id }}</strong> {{ CRITERIA[f.criterion_id] }} <span class="{{ f.rating or 'NE' }}">{{ RATINGS[f.rating] if f.rating else "Not evaluated" }}</span><p class="muted">{{ f.explanation }}</p></li>{% endfor %}</ul>{% endif %}
+<details class="json"><summary>Response JSON</summary><pre>{{ ie.model_dump_json(indent=2) }}</pre></details>
+</article>
+<article class="handoff">
+<h3>Integration → Claim Investigation</h3>
+<p class="muted">One request per claim.</p>
+{% for item in output.ci_requests %}<div class="ask"><p><strong>Claim {{ loop.index }}</strong> <code>{{ item.claim_text }}</code></p>{% if item.relevant_context %}<p>{{ item.relevant_context | short }}</p>{% endif %}{% if item.named_project_versions %}<p class="muted">Versions: {{ item.named_project_versions | join(", ") }}</p>{% endif %}<p class="muted">From {{ where(item.source) }}</p><details class="json"><summary>Request JSON</summary><pre>{{ item.model_dump_json(indent=2) }}</pre></details></div>{% else %}<p>No CI request.</p>{% endfor %}
+</article>
+<article class="handoff">
+<h3>Claim Investigation → Integration</h3>
+{% for item in output.ci_results %}{% set f = item.findings[0] if item.findings else none %}<div class="ask"><p><strong>{{ item.claim_id }}</strong>{% if f %} <span class="{{ f.outcome.split()[0] }}">{{ OUTCOMES[f.outcome] }}</span>{% endif %}</p>{% if f %}<p>{{ f.explanation }}</p>{% if f.evidence %}<ul>{% for e in f.evidence %}<li>{{ e.type }}: {{ e.reference }} <span class="muted">{{ e.explanation }}</span></li>{% endfor %}</ul>{% endif %}{% else %}<p class="muted">No finding in this response.</p>{% endif %}{% if item.limitation %}<p class="muted">{{ item.limitation }}</p>{% endif %}<details class="json"><summary>Response JSON</summary><pre>{{ item.model_dump_json(indent=2) }}</pre></details></div>{% else %}<p>No Claim Investigation response was received.</p>{% endfor %}
+</article>
+</div>
 <details><summary>Technical details</summary>
 <p>Request <code>{{ rec.request_id }}</code>, snapshot <code>{{ rec.snapshot_id }}</code>, source: {{ output.source }}, content hash (sha256): <code>{{ output.sha256 }}</code></p>
 <p>Criteria version: <code>{{ ie.provenance.criteria_version }}</code>, evaluator: <code>{{ ie.provenance.evaluator_version }}</code>, evaluated at {{ ie.provenance.evaluated_at }}</p>
 <p>Extraction: {{ rec.extraction.mode }}, {{ rec.sections | length }} sections{% for d in rec.extraction.diagnostics %}<br>{{ d.code }}: {{ d.message }}{% endfor %}</p></details>
+</div>
+<script>
+document.querySelectorAll('a[href^="#L"]').forEach(link => {
+  link.addEventListener("click", event => {
+    const row = document.querySelector(link.getAttribute("href"));
+    if (!row) return;
+    event.preventDefault();
+    row.scrollIntoView({block: "center"});
+    history.replaceState(null, "", link.getAttribute("href"));
+  });
+});
+</script>
 </body></html>
